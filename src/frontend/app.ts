@@ -77,20 +77,30 @@ class App {
   }
 
   private async createNewSession(): Promise<void> {
-    const name = prompt('Session name:', `session-${Date.now()}`);
-    if (!name) return;
-    const cwd = prompt('Working directory:', '/tmp');
-    if (!cwd) return;
+    try {
+      const name = prompt('Session name:', `session-${Date.now()}`);
+      if (!name) return;
+      const cwd = prompt('Working directory:', '/tmp');
+      if (!cwd) return;
 
-    const res = await fetch('/api/sessions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, cwd }),
-    });
-    const session: SessionSummary = await res.json();
-    this.sessions.unshift(session);
-    this.sessionList.render(this.sessions, this.currentSessionId);
-    this.switchSession(session.id);
+      const res = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, cwd }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+        alert('Failed to create session: ' + (err.error || res.statusText));
+        return;
+      }
+      const session: SessionSummary = await res.json();
+      this.sessions.unshift(session);
+      this.sessionList.render(this.sessions, this.currentSessionId);
+      this.switchSession(session.id);
+    } catch (e) {
+      console.error('createNewSession error:', e);
+      alert('Error creating session. Check console for details.');
+    }
   }
 
   private connect(sessionId: string): void {
