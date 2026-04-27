@@ -1,0 +1,18 @@
+declare module 'xterm' {
+  export class Terminal {
+    constructor(options?: any);
+    loadAddon(addon: any): void;
+    open(element: HTMLElement): void;
+    write(data: string | Uint8Array): void;
+    onData(callback: (data: string) => void): void;
+    resize(cols: number, rows: number): void;
+    clear(): void;
+  }
+}
+
+declare module 'xterm-addon-fit' {
+  export class FitAddon {
+    fit(): void;
+    proposeDimensions(): { cols: number; rows: number } | undefined;
+  }
+}

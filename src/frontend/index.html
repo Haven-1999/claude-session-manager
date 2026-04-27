@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Session Manager</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+</head>
+<body>
+  <div id="app">
+    <header class="top-bar">
+      <span class="logo">Claude Session Manager</span>
+      <div class="actions">
+        <button id="btn-new">+ New Session</button>
+      </div>
+    </header>
+    <div class="main-layout">
+      <aside id="session-list" class="sidebar left"></aside>
+      <main id="terminal-panel" class="terminal-area">
+        <div id="terminal-container"></div>
+        <div id="connection-overlay" class="hidden"></div>
+      </main>
+      <aside id="session-info" class="sidebar right collapsed"></aside>
+    </div>
+  </div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
