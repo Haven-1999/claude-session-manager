@@ -10,7 +10,12 @@ export class SessionManager {
   createSession(name: string, cwd: string): Session {
     const record = this.memory.createSession({ name, cwd, status: 'running' });
     const session: Session = {
-      ...record,
+      id: record.id,
+      name: record.name,
+      cwd: record.cwd,
+      status: record.status,
+      createdAt: record.created_at,
+      lastActiveAt: record.last_active_at,
       ptyProcess: null,
       clients: new Set(),
     };
@@ -77,7 +82,12 @@ export class SessionManager {
     const records = this.memory.loadNonStoppedSessions();
     for (const r of records) {
       this.sessions.set(r.id, {
-        ...r,
+        id: r.id,
+        name: r.name,
+        cwd: r.cwd,
+        status: r.status,
+        createdAt: r.created_at,
+        lastActiveAt: r.last_active_at,
         ptyProcess: null,
         clients: new Set(),
       });

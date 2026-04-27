@@ -1,6 +1,6 @@
 import * as pty from 'node-pty';
 import type { Session } from './types';
-import type WebSocket from 'ws';
+import WebSocket from 'ws';
 
 export interface PtyOptions {
   cwd: string;
