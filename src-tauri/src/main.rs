@@ -5,6 +5,15 @@ mod config;
 mod tunnel;
 
 use std::sync::Mutex;
+use tauri::command;
+
+#[command]
+fn open_settings(window: tauri::WebviewWindow) -> Result<(), String> {
+    window
+        .eval("window.location.href = 'index.html'")
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
 
 fn main() {
     tauri::Builder::default()
@@ -17,6 +26,7 @@ fn main() {
             tunnel::start_tunnel,
             tunnel::stop_tunnel,
             tunnel::check_connection,
+            open_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

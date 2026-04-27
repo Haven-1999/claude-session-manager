@@ -22,8 +22,11 @@ class App {
   private reconnectDelay = 1000;
   private sessionList: SessionList;
   private sessionInfo: SessionInfo;
+  private isTauri: boolean;
 
   constructor() {
+    this.isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__;
+
     this.terminal = new Terminal({
       cursorBlink: true,
       fontSize: 14,
@@ -53,6 +56,16 @@ class App {
     });
 
     document.getElementById('btn-new')!.addEventListener('click', () => this.createNewSession());
+
+    if (this.isTauri) {
+      const actions = document.querySelector('.actions')!;
+      const settingsBtn = document.createElement('button');
+      settingsBtn.id = 'btn-settings';
+      settingsBtn.textContent = 'Settings';
+      settingsBtn.style.marginLeft = '8px';
+      settingsBtn.addEventListener('click', () => this.openSettings());
+      actions.appendChild(settingsBtn);
+    }
 
     this.loadSessions();
   }
@@ -208,6 +221,21 @@ class App {
 
   private hideOverlay(): void {
     document.getElementById('connection-overlay')!.classList.add('hidden');
+  }
+
+  private async openSettings(): Promise<void> {
+    try {
+      const tauri = (window as any).__TAURI__;
+      if (tauri && tauri.core && tauri.core.invoke) {
+        await tauri.core.invoke('open_settings');
+      } else if (tauri && tauri.invoke) {
+        await tauri.invoke('open_settings');
+      } else {
+        console.warn('Tauri invoke API not found');
+      }
+    } catch (e) {
+      console.error('openSettings error:', e);
+    }
   }
 }
 
