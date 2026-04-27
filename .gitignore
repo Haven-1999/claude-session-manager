@@ -5,3 +5,4 @@ public/*.css
 *.log
 .env
 .DS_Store
+.worktrees/
