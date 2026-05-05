@@ -9,19 +9,17 @@ use tauri::command;
 
 #[command]
 fn open_settings(window: tauri::WebviewWindow) -> Result<(), String> {
-    let url: tauri::Url = "tauri://localhost/index.html"
-        .parse()
-        .map_err(|e: url::ParseError| e.to_string())?;
-    window.navigate(url).map_err(|e| e.to_string())?;
+    window
+        .eval("window.location.replace('index.html')")
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
 #[command]
 fn navigate_to_url(window: tauri::WebviewWindow, url: String) -> Result<(), String> {
-    let url: tauri::Url = url
-        .parse()
-        .map_err(|e: url::ParseError| e.to_string())?;
-    window.navigate(url).map_err(|e| e.to_string())?;
+    window
+        .eval(&format!("window.location.replace('{}')", url))
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
