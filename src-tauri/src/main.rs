@@ -15,7 +15,8 @@ fn open_settings(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<
     if let Some(existing) = app.get_webview_window("csm") {
         let _ = existing.close();
     }
-    tauri::WebviewWindowBuilder::new(&app, "main", PathBuf::from("index.html"))
+    tauri::WebviewWindowBuilder::new(
+        &app, "main", tauri::WebviewUrl::App(PathBuf::from("index.html")))
         .title("Claude Session Manager")
         .inner_size(1200.0, 800.0)
         .build()
@@ -28,8 +29,8 @@ fn open_csm_window(app: tauri::AppHandle, url: String) -> Result<(), String> {
     if let Some(existing) = app.get_webview_window("csm") {
         let _ = existing.close();
     }
-    let parsed: tauri::Url = url.parse().map_err(|e| e.to_string())?;
-    tauri::WebviewWindowBuilder::new(&app, "csm", parsed)
+    let parsed = tauri::Url::parse(&url).map_err(|e| e.to_string())?;
+    tauri::WebviewWindowBuilder::new(&app, "csm", tauri::WebviewUrl::External(parsed))
         .title("Claude Session Manager")
         .inner_size(1200.0, 800.0)
         .build()
