@@ -9,20 +9,24 @@ use tauri::command;
 
 #[command]
 fn open_settings(window: tauri::WebviewWindow) -> Result<(), String> {
-    window
-        .eval("window.location.replace('index.html')")
-        .map_err(|e| e.to_string())?;
+    let js = r#"
+        (function() {
+            const frame = document.getElementById('app-frame');
+            const form = document.getElementById('setup-form');
+            if (frame && form) {
+                frame.style.display = 'none';
+                frame.src = '';
+                form.style.display = 'block';
+            }
+        })();
+    "#;
+    window.eval(js).map_err(|e| e.to_string())?;
     Ok(())
 }
 
 #[command]
-fn navigate_to_url(window: tauri::WebviewWindow, url: String) -> Result<(), String> {
-    println!("[navigate_to_url] target={}", url);
-    let js = format!(
-        "try {{ window.location.replace('{}'); console.log('[TAURI] Navigation initiated to {}'); }} catch(e) {{ console.error('[TAURI] Navigation error:', e); }}",
-        url, url
-    );
-    window.eval(&js).map_err(|e| e.to_string())?;
+fn navigate_to_url(_window: tauri::WebviewWindow, url: String) -> Result<(), String> {
+    println!("[navigate_to_url] target={} — iframe handles this now", url);
     Ok(())
 }
 

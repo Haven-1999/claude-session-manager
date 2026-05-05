@@ -75,25 +75,14 @@ async function doConnect(config) {
     const ok = await invoke('check_connection', { localPort: config.local_port });
     if (ok) {
       showStatus('Connected! Loading CSM...', 'success');
-      console.log('[SETUP] Tunnel ready, navigating to http://localhost:' + config.local_port);
-      try {
-        await invoke('navigate_to_url', { url: 'http://localhost:' + config.local_port });
-        // Fallback: if eval navigation doesn't work, offer manual link
-        setTimeout(() => {
-          if (document.body) {
-            const msg = document.createElement('div');
-            msg.innerHTML = `
-              <p style="margin-top:12px">
-                If page doesn't load, <a href="http://localhost:${config.local_port}" target="_self" style="color:#007acc">click here</a>
-                or open http://localhost:${config.local_port} in your browser.
-              </p>`;
-            statusEl.appendChild(msg);
-          }
-        }, 3000);
-      } catch (e) {
-        console.error('[SETUP] Navigation error:', e);
-        showStatus('Navigation failed: ' + e, 'error');
-        connectBtn.disabled = false;
+      console.log('[SETUP] Tunnel ready, loading http://localhost:' + config.local_port);
+      // Use iframe to load remote CSM — avoids Tauri navigation blocking
+      const frame = document.getElementById('app-frame');
+      const form = document.getElementById('setup-form');
+      if (frame && form) {
+        frame.src = 'http://localhost:' + config.local_port;
+        form.style.display = 'none';
+        frame.style.display = 'block';
       }
       return;
     }
