@@ -26,15 +26,19 @@ fn open_settings(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<
 
 #[command]
 fn open_csm_window(app: tauri::AppHandle, url: String) -> Result<(), String> {
+    println!("[TAURI] open_csm_window called with url: {}", url);
     if let Some(existing) = app.get_webview_window("csm") {
+        println!("[TAURI] Closing existing csm window");
         let _ = existing.close();
     }
     let parsed = tauri::Url::parse(&url).map_err(|e| e.to_string())?;
-    tauri::WebviewWindowBuilder::new(&app, "csm", tauri::WebviewUrl::External(parsed))
+    println!("[TAURI] Parsed URL: {:?}", parsed);
+    let win = tauri::WebviewWindowBuilder::new(&app, "csm", tauri::WebviewUrl::External(parsed))
         .title("Claude Session Manager")
         .inner_size(1200.0, 800.0)
         .build()
         .map_err(|e| e.to_string())?;
+    println!("[TAURI] Created csm window with label: {:?}", win.label());
     Ok(())
 }
 

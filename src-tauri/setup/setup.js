@@ -50,10 +50,13 @@ async function doConnect(config) {
   clearStatus();
   connectBtn.disabled = true;
   showStatus('Saving configuration...', 'loading');
+  console.log('[SETUP] Step 1: save_config', config);
 
   try {
     await invoke('save_config', { config });
+    console.log('[SETUP] save_config OK');
   } catch (e) {
+    console.error('[SETUP] save_config failed:', e);
     showStatus('Failed to save config: ' + e, 'error');
     connectBtn.disabled = false;
     return;
@@ -62,7 +65,9 @@ async function doConnect(config) {
   showStatus('Starting SSH tunnel...', 'loading');
   try {
     await invoke('start_tunnel', { config });
+    console.log('[SETUP] start_tunnel OK');
   } catch (e) {
+    console.error('[SETUP] start_tunnel failed:', e);
     showStatus('Failed to start tunnel: ' + e, 'error');
     connectBtn.disabled = false;
     return;
@@ -72,11 +77,16 @@ async function doConnect(config) {
   const maxAttempts = 60;
   for (let i = 0; i < maxAttempts; i++) {
     const ok = await invoke('check_connection', { localPort: config.local_port });
+    console.log('[SETUP] check_connection attempt', i + 1, '=>', ok);
     if (ok) {
       showStatus('Connected! Opening CSM...', 'success');
+      const csmUrl = 'http://localhost:' + config.local_port;
+      console.log('[SETUP] Step 4: open_csm_window', csmUrl);
       try {
-        await invoke('open_csm_window', { url: 'http://localhost:' + config.local_port });
+        await invoke('open_csm_window', { url: csmUrl });
+        console.log('[SETUP] open_csm_window OK');
         const current = getCurrentWebviewWindow();
+        console.log('[SETUP] Closing setup window');
         await current.close();
       } catch (e) {
         console.error('[SETUP] Failed to open CSM window:', e);

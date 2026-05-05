@@ -71,11 +71,21 @@ class App {
   }
 
   private async loadSessions(): Promise<void> {
-    const res = await fetch('/api/sessions');
-    this.sessions = await res.json();
-    this.sessionList.render(this.sessions, this.currentSessionId);
-    if (this.sessions.length > 0 && !this.currentSessionId) {
-      this.switchSession(this.sessions[0].id);
+    try {
+      console.log('[CSM] Loading sessions...');
+      const res = await fetch('/api/sessions');
+      if (!res.ok) {
+        console.error('[CSM] fetch /api/sessions failed:', res.status, res.statusText);
+        return;
+      }
+      this.sessions = await res.json();
+      console.log('[CSM] Loaded sessions:', this.sessions.length);
+      this.sessionList.render(this.sessions, this.currentSessionId);
+      if (this.sessions.length > 0 && !this.currentSessionId) {
+        this.switchSession(this.sessions[0].id);
+      }
+    } catch (e) {
+      console.error('[CSM] loadSessions error:', e);
     }
   }
 

@@ -1,0 +1,19 @@
+{
+  "identifier": "default",
+  "description": "Default capabilities for the CSM app",
+  "windows": ["main", "csm"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-create",
+    "core:window:allow-close",
+    "core:window:allow-show",
+    "allow-get-config",
+    "allow-save-config",
+    "allow-start-tunnel",
+    "allow-stop-tunnel",
+    "allow-check-connection",
+    "allow-open-settings",
+    "allow-open-csm-window",
+    "allow-close-window"
+  ]
+}
