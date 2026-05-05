@@ -1,4 +1,5 @@
 import { invoke } from 'https://esm.sh/@tauri-apps/api@2.0.0/core';
+import { getCurrentWebviewWindow } from 'https://esm.sh/@tauri-apps/api@2.0.0/webviewWindow';
 
 const $ = (id) => document.getElementById(id);
 const statusEl = $('status');
@@ -39,8 +40,6 @@ async function loadExistingConfig() {
     const config = await invoke('get_config');
     if (config) {
       setFormData(config);
-      // Optionally auto-connect
-      // await doConnect(config);
     }
   } catch (e) {
     console.error('Failed to load config:', e);
@@ -70,19 +69,19 @@ async function doConnect(config) {
   }
 
   showStatus('Waiting for tunnel...', 'loading');
-  const maxAttempts = 60; // 30 seconds
+  const maxAttempts = 60;
   for (let i = 0; i < maxAttempts; i++) {
     const ok = await invoke('check_connection', { localPort: config.local_port });
     if (ok) {
-      showStatus('Connected! Loading CSM...', 'success');
-      console.log('[SETUP] Tunnel ready, loading http://localhost:' + config.local_port);
-      // Use iframe to load remote CSM — avoids Tauri navigation blocking
-      const frame = document.getElementById('app-frame');
-      const form = document.getElementById('setup-form');
-      if (frame && form) {
-        frame.src = 'http://localhost:' + config.local_port;
-        form.style.display = 'none';
-        frame.style.display = 'block';
+      showStatus('Connected! Opening CSM...', 'success');
+      try {
+        await invoke('open_csm_window', { url: 'http://localhost:' + config.local_port });
+        const current = getCurrentWebviewWindow();
+        await current.close();
+      } catch (e) {
+        console.error('[SETUP] Failed to open CSM window:', e);
+        showStatus('Failed to open CSM window: ' + e, 'error');
+        connectBtn.disabled = false;
       }
       return;
     }
@@ -102,5 +101,4 @@ connectBtn.addEventListener('click', async () => {
   await doConnect(config);
 });
 
-// Load saved config on startup
 loadExistingConfig();

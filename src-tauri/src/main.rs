@@ -6,27 +6,39 @@ mod tunnel;
 
 use std::sync::Mutex;
 use tauri::command;
+use tauri::webview::WebviewUrl;
 
 #[command]
-fn open_settings(window: tauri::WebviewWindow) -> Result<(), String> {
-    let js = r#"
-        (function() {
-            const frame = document.getElementById('app-frame');
-            const form = document.getElementById('setup-form');
-            if (frame && form) {
-                frame.style.display = 'none';
-                frame.src = '';
-                form.style.display = 'block';
-            }
-        })();
-    "#;
-    window.eval(js).map_err(|e| e.to_string())?;
+fn open_settings(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<(), String> {
+    let _ = window.close();
+    if let Some(existing) = app.get_webview_window("csm") {
+        let _ = existing.close();
+    }
+    tauri::WebviewWindowBuilder::new(&app, "main", WebviewUrl::App("index.html".into()))
+        .title("Claude Session Manager")
+        .inner_size(1200.0, 800.0)
+        .build()
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
 #[command]
-fn navigate_to_url(_window: tauri::WebviewWindow, url: String) -> Result<(), String> {
-    println!("[navigate_to_url] target={} — iframe handles this now", url);
+fn open_csm_window(app: tauri::AppHandle, url: String) -> Result<(), String> {
+    if let Some(existing) = app.get_webview_window("csm") {
+        let _ = existing.close();
+    }
+    let parsed: tauri::Url = url.parse().map_err(|e| e.to_string())?;
+    tauri::WebviewWindowBuilder::new(&app, "csm", WebviewUrl::External(parsed))
+        .title("Claude Session Manager")
+        .inner_size(1200.0, 800.0)
+        .build()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[command]
+fn close_window(window: tauri::WebviewWindow) -> Result<(), String> {
+    window.close().map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -42,7 +54,8 @@ fn main() {
             tunnel::stop_tunnel,
             tunnel::check_connection,
             open_settings,
-            navigate_to_url,
+            open_csm_window,
+            close_window,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
