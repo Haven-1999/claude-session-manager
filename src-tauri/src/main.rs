@@ -17,9 +17,12 @@ fn open_settings(window: tauri::WebviewWindow) -> Result<(), String> {
 
 #[command]
 fn navigate_to_url(window: tauri::WebviewWindow, url: String) -> Result<(), String> {
-    window
-        .eval(&format!("window.location.replace('{}')", url))
-        .map_err(|e| e.to_string())?;
+    println!("[navigate_to_url] target={}", url);
+    let js = format!(
+        "try {{ window.location.replace('{}'); console.log('[TAURI] Navigation initiated to {}'); }} catch(e) {{ console.error('[TAURI] Navigation error:', e); }}",
+        url, url
+    );
+    window.eval(&js).map_err(|e| e.to_string())?;
     Ok(())
 }
 
