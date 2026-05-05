@@ -10,7 +10,15 @@ use tauri::command;
 #[command]
 fn open_settings(window: tauri::WebviewWindow) -> Result<(), String> {
     window
-        .eval("window.location.href = 'index.html'")
+        .navigate("tauri://localhost/index.html".parse().map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[command]
+fn navigate_to_url(window: tauri::WebviewWindow, url: String) -> Result<(), String> {
+    window
+        .navigate(url.parse().map_err(|e| e.to_string())?)
         .map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -27,6 +35,7 @@ fn main() {
             tunnel::stop_tunnel,
             tunnel::check_connection,
             open_settings,
+            navigate_to_url,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

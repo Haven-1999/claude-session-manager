@@ -75,7 +75,12 @@ async function doConnect(config) {
     const ok = await invoke('check_connection', { localPort: config.local_port });
     if (ok) {
       showStatus('Connected! Loading CSM...', 'success');
-      window.location.href = 'http://localhost:' + config.local_port;
+      try {
+        await invoke('navigate_to_url', { url: 'http://localhost:' + config.local_port });
+      } catch (e) {
+        showStatus('Navigation failed: ' + e, 'error');
+        connectBtn.disabled = false;
+      }
       return;
     }
     await new Promise((r) => setTimeout(r, 500));
