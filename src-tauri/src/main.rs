@@ -6,7 +6,7 @@ mod tunnel;
 
 use std::sync::Mutex;
 use tauri::command;
-use tauri::webview::WebviewUrl;
+use tauri_utils::config::WebviewUrl;
 
 #[command]
 fn open_settings(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<(), String> {
