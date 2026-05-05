@@ -4,9 +4,10 @@
 mod config;
 mod tunnel;
 
+use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::command;
-use tauri_utils::config::WebviewUrl;
+use tauri::Manager;
 
 #[command]
 fn open_settings(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<(), String> {
@@ -14,7 +15,7 @@ fn open_settings(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<
     if let Some(existing) = app.get_webview_window("csm") {
         let _ = existing.close();
     }
-    tauri::WebviewWindowBuilder::new(&app, "main", WebviewUrl::App("index.html".into()))
+    tauri::WebviewWindowBuilder::new(&app, "main", PathBuf::from("index.html"))
         .title("Claude Session Manager")
         .inner_size(1200.0, 800.0)
         .build()
@@ -28,7 +29,7 @@ fn open_csm_window(app: tauri::AppHandle, url: String) -> Result<(), String> {
         let _ = existing.close();
     }
     let parsed: tauri::Url = url.parse().map_err(|e| e.to_string())?;
-    tauri::WebviewWindowBuilder::new(&app, "csm", WebviewUrl::External(parsed))
+    tauri::WebviewWindowBuilder::new(&app, "csm", parsed)
         .title("Claude Session Manager")
         .inner_size(1200.0, 800.0)
         .build()
