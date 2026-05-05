@@ -82,14 +82,18 @@ async function doConnect(config) {
       showStatus('Connected! Opening CSM...', 'success');
       const csmUrl = 'http://localhost:' + config.local_port;
       console.log('[SETUP] Step 4: open_csm_window', csmUrl);
+      window.alert('DEBUG: Tunnel ready. About to open: ' + csmUrl);
       try {
         await invoke('open_csm_window', { url: csmUrl });
         console.log('[SETUP] open_csm_window OK');
+        window.alert('DEBUG: open_csm_window succeeded!');
         const current = getCurrentWebviewWindow();
-        console.log('[SETUP] Closing setup window');
+        console.log('[SETUP] Closing setup window in 5s...');
+        await new Promise((r) => setTimeout(r, 5000));
         await current.close();
       } catch (e) {
         console.error('[SETUP] Failed to open CSM window:', e);
+        window.alert('DEBUG ERROR: ' + JSON.stringify(e));
         showStatus('Failed to open CSM window: ' + e, 'error');
         connectBtn.disabled = false;
       }
