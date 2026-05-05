@@ -19,6 +19,7 @@ fn open_settings(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<
         &app, "main", tauri::WebviewUrl::App(PathBuf::from("index.html")))
         .title("Claude Session Manager")
         .inner_size(1200.0, 800.0)
+        .devtools(true)
         .build()
         .map_err(|e| e.to_string())?;
     Ok(())
@@ -36,6 +37,7 @@ fn open_csm_window(app: tauri::AppHandle, url: String) -> Result<(), String> {
     let win = tauri::WebviewWindowBuilder::new(&app, "csm", tauri::WebviewUrl::External(parsed))
         .title("Claude Session Manager")
         .inner_size(1200.0, 800.0)
+        .devtools(true)
         .build()
         .map_err(|e| e.to_string())?;
     println!("[TAURI] Created csm window with label: {:?}", win.label());

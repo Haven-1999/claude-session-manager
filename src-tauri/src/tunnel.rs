@@ -1,16 +1,29 @@
 use crate::config::AppConfig;
+use std::fs::File;
 use std::net::TcpStream;
+use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use std::time::Duration;
-use tauri::{command, State};
+use tauri::{command, AppHandle, State};
 
 pub struct TunnelState {
     pub child: Mutex<Option<Child>>,
 }
 
+fn ssh_log_path(app: &AppHandle) -> PathBuf {
+    app.path()
+        .app_log_dir()
+        .unwrap_or_else(|_| PathBuf::from("/tmp"))
+        .join("csm-ssh.log")
+}
+
 #[command]
-pub fn start_tunnel(config: AppConfig, state: State<TunnelState>) -> Result<(), String> {
+pub fn start_tunnel(
+    config: AppConfig,
+    state: State<TunnelState>,
+    app: AppHandle,
+) -> Result<(), String> {
     // Stop any existing tunnel first
     {
         let mut guard = state.child.lock().map_err(|e| e.to_string())?;
@@ -19,12 +32,21 @@ pub fn start_tunnel(config: AppConfig, state: State<TunnelState>) -> Result<(), 
         }
     }
 
+    let log_path = ssh_log_path(&app);
+    if let Some(parent) = log_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let log_file = File::create(&log_path)
+        .map_err(|e| format!("Failed to create ssh log file: {}", e))?;
+
     let mut cmd = Command::new("ssh");
     cmd.arg("-N")
         .arg("-o")
         .arg("ServerAliveInterval=30")
         .arg("-o")
         .arg("ExitOnForwardFailure=yes")
+        .arg("-o")
+        .arg("BatchMode=yes")
         .arg("-L")
         .arg(format!(
             "{}:localhost:{}",
@@ -40,7 +62,7 @@ pub fn start_tunnel(config: AppConfig, state: State<TunnelState>) -> Result<(), 
     }
 
     cmd.arg(format!("{}@{}", config.ssh_user, config.ssh_host));
-    cmd.stdout(Stdio::null()).stderr(Stdio::null());
+    cmd.stdout(Stdio::null()).stderr(Stdio::from(log_file));
 
     let child = cmd
         .spawn()
@@ -48,6 +70,22 @@ pub fn start_tunnel(config: AppConfig, state: State<TunnelState>) -> Result<(), 
 
     let mut guard = state.child.lock().map_err(|e| e.to_string())?;
     *guard = Some(child);
+
+    // Wait briefly then verify the process did not exit immediately
+    std::thread::sleep(Duration::from_secs(1));
+    if let Some(ref mut c) = *guard {
+        match c.try_wait() {
+            Ok(Some(status)) => {
+                let log_content = std::fs::read_to_string(&log_path).unwrap_or_default();
+                return Err(format!(
+                    "SSH tunnel exited immediately (status: {}). Log:\n{}",
+                    status, log_content
+                ));
+            }
+            Ok(None) => {}
+            Err(e) => return Err(format!("Failed to check tunnel status: {}", e)),
+        }
+    }
 
     Ok(())
 }
