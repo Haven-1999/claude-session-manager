@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use std::time::Duration;
-use tauri::{command, AppHandle, State};
+use tauri::{command, AppHandle, Manager, State};
 
 pub struct TunnelState {
     pub child: Mutex<Option<Child>>,
