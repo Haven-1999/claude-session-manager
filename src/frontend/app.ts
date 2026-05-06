@@ -310,23 +310,25 @@ class App {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws?sessionId=${sessionId}`;
     this.ws = new WebSocket(wsUrl);
+    const ws = this.ws;
 
     this.showOverlay('Connecting...');
 
-    this.ws.onopen = () => {
+    ws.onopen = () => {
+      if (this.ws !== ws || this.activeSessionId !== sessionId) return;
       this.hideOverlay();
       this.reconnectDelay = 1000;
       this.sendResize();
       this.startHeartbeat();
     };
 
-    this.ws.onmessage = (event) => {
+    ws.onmessage = (event) => {
+      if (this.ws !== ws || this.activeSessionId !== sessionId) return;
       try {
         const msg = JSON.parse(event.data);
         if (msg.type === 'output') {
-          // Only write if still connected to this session
           const entry = this.terminals.get(sessionId);
-          if (entry && this.activeSessionId === sessionId) {
+          if (entry) {
             entry.terminal.write(msg.data);
           }
         } else if (msg.type === 'status') {
@@ -339,13 +341,13 @@ class App {
       }
     };
 
-    this.ws.onclose = () => {
+    ws.onclose = () => {
       this.stopHeartbeat();
       this.scheduleReconnect(sessionId);
     };
 
-    this.ws.onerror = () => {
-      this.ws?.close();
+    ws.onerror = () => {
+      ws.close();
     };
   }
 
@@ -356,10 +358,12 @@ class App {
       this.reconnectTimer = null;
     }
     if (this.ws) {
-      // Prevent onclose from triggering scheduleReconnect for a manually-closed ws
-      this.ws.onclose = null;
-      this.ws.onerror = null;
-      this.ws.close();
+      const ws = this.ws;
+      ws.onopen = null;
+      ws.onmessage = null;
+      ws.onclose = null;
+      ws.onerror = null;
+      ws.close();
       this.ws = null;
     }
   }
