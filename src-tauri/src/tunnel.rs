@@ -49,11 +49,10 @@ fn kill_process_on_port(port: u16) {
     }
 }
 
-#[command]
-pub fn start_tunnel(
-    config: AppConfig,
-    state: State<TunnelState>,
-    app: AppHandle,
+pub fn start_tunnel_inner(
+    config: &AppConfig,
+    state: &TunnelState,
+    app: &AppHandle,
 ) -> Result<(), String> {
     // 1. If the port is already reachable, reuse the existing tunnel
     if check_connection(config.local_port) {
@@ -73,7 +72,7 @@ pub fn start_tunnel(
     kill_process_on_port(config.local_port);
     std::thread::sleep(Duration::from_millis(300));
 
-    let log_path = ssh_log_path(&app);
+    let log_path = ssh_log_path(app);
     if let Some(parent) = log_path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
@@ -96,7 +95,7 @@ pub fn start_tunnel(
         .arg("-p")
         .arg(config.ssh_port.to_string());
 
-    if let Some(identity) = config.identity_file {
+    if let Some(identity) = &config.identity_file {
         if !identity.is_empty() {
             cmd.arg("-i").arg(identity);
         }
@@ -127,7 +126,6 @@ pub fn start_tunnel(
         match c.try_wait() {
             Ok(Some(status)) => {
                 let log_content = std::fs::read_to_string(&log_path).unwrap_or_default();
-                // Provide actionable guidance for common errors
                 let hint = if log_content.contains("Address already in use") {
                     "Local port is still occupied after cleanup. Try changing the Local Port in Settings (e.g., 18081)."
                 } else if log_content.contains("Connection refused") {
@@ -148,6 +146,15 @@ pub fn start_tunnel(
     }
 
     Ok(())
+}
+
+#[command]
+pub fn start_tunnel(
+    config: AppConfig,
+    state: State<TunnelState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    start_tunnel_inner(&config, &state, &app)
 }
 
 #[command]
