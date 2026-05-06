@@ -25,6 +25,8 @@ export function spawnPty(options: PtyOptions): pty.IPty {
       CLAUDE_SESSION_ID: sessionId,
       CLAUDE_CSM_MODE: '1',
       TERM: 'xterm-256color',
+      LANG: 'en_US.UTF-8',
+      LC_ALL: 'en_US.UTF-8',
     },
   });
 

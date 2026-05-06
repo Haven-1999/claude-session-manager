@@ -31,7 +31,7 @@ class App {
     this.terminal = new Terminal({
       cursorBlink: true,
       fontSize: 14,
-      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      fontFamily: '"JetBrains Mono", "Fira Code", Menlo, Monaco, "Courier New", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", monospace',
       theme: {
         background: '#0d1117',
         foreground: '#e6edf3',
