@@ -28,7 +28,7 @@ fn open_settings(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<
 #[command]
 fn open_csm_window(app: tauri::AppHandle, url: String) -> Result<(), String> {
     println!("[TAURI] open_csm_window called with url: {}", url);
-    if let Some(existing) = app.get_webview_window("csm") {
+    if let Some(_existing) = app.get_webview_window("csm") {
         println!("[TAURI] Existing csm window found, skipping");
         return Ok(());
     }
