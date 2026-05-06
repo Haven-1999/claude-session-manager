@@ -54,11 +54,14 @@ pub fn start_tunnel_inner(
     state: &TunnelState,
     app: &AppHandle,
 ) -> Result<(), String> {
-    // 1. If the port is already reachable, reuse the existing tunnel
-    if check_connection(config.local_port) {
-        println!("[TAURI] Port {} is already reachable, reusing existing tunnel.", config.local_port);
+    // 1. If the port is healthy, reuse the existing tunnel
+    if http_health_check(config.local_port) {
+        println!("[TAURI] Port {} is healthy, reusing existing tunnel.", config.local_port);
         return Ok(());
     }
+
+    // 2. Port is not healthy — kill any stale process and rebuild tunnel
+    println!("[TAURI] Port {} is not healthy, rebuilding tunnel...", config.local_port);
 
     // 2. Stop any tunnel tracked by our own state
     {
@@ -163,12 +166,33 @@ pub fn stop_tunnel(state: State<TunnelState>) -> Result<(), String> {
     Ok(())
 }
 
-#[command]
-pub fn check_connection(local_port: u16) -> bool {
+fn http_health_check(local_port: u16) -> bool {
     let addr = format!("127.0.0.1:{}", local_port);
-    TcpStream::connect_timeout(
+    match TcpStream::connect_timeout(
         &addr.parse().expect("valid socket addr"),
         Duration::from_secs(2),
-    )
-    .is_ok()
+    ) {
+        Ok(mut stream) => {
+            let _ = stream.set_write_timeout(Some(Duration::from_secs(2)));
+            let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
+            let req = format!("HEAD /api/sessions HTTP/1.1\r\nHost: localhost:{}\r\nConnection: close\r\n\r\n", local_port);
+            if stream.write_all(req.as_bytes()).is_err() {
+                return false;
+            }
+            let mut buf = [0u8; 32];
+            match stream.read(&mut buf) {
+                Ok(n) if n > 0 => {
+                    let response = String::from_utf8_lossy(&buf[..n]);
+                    response.contains("HTTP/1.1 200") || response.contains("HTTP/1.1 401")
+                }
+                _ => false,
+            }
+        }
+        Err(_) => false,
+    }
+}
+
+#[command]
+pub fn check_connection(local_port: u16) -> bool {
+    http_health_check(local_port)
 }

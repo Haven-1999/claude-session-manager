@@ -5,12 +5,9 @@ mod config;
 mod tunnel;
 
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::command;
 use tauri::Manager;
-
-static CSM_WINDOW_OPENING: AtomicBool = AtomicBool::new(false);
 
 #[command]
 fn open_settings(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<(), String> {
@@ -31,11 +28,6 @@ fn open_settings(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<
 #[command]
 fn open_csm_window(app: tauri::AppHandle, url: String) -> Result<(), String> {
     println!("[TAURI] open_csm_window called with url: {}", url);
-    // Prevent concurrent calls from multiple threads (e.g., auto-start + setup page)
-    if CSM_WINDOW_OPENING.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_err() {
-        println!("[TAURI] Another open_csm_window is already in progress, skipping");
-        return Ok(());
-    }
     if let Some(existing) = app.get_webview_window("csm") {
         println!("[TAURI] Existing csm window found, skipping");
         return Ok(());
@@ -108,7 +100,7 @@ fn main() {
                         match tunnel::start_tunnel_inner(&cfg_clone, &*state, &app_clone) {
                             Ok(_) => {
                                 println!("[TAURI] Tunnel started, waiting for port {} to be ready...", local_port);
-                                for i in 0..30 {
+                                for _ in 0..30 {
                                     if tunnel::check_connection(local_port) {
                                         println!("[TAURI] Port ready, opening CSM window");
                                         let url = format!("http://localhost:{}", local_port);
