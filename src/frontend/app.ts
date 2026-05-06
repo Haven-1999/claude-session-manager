@@ -367,7 +367,7 @@ class App {
       this.reconnectDelay = 1000;
       // Force status to running since we are connected
       this.updateSessionStatus(sessionId, 'running');
-      // Ensure terminal dimensions are correct before telling PTY
+      // Always send resize so backend spawns PTY even if terminal isn't ready yet
       const entry = this.terminals.get(sessionId);
       if (entry) {
         requestAnimationFrame(() => {
@@ -454,12 +454,15 @@ class App {
 
   private sendResize(): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN || !this.activeSessionId) return;
+    let cols = 120;
+    let rows = 30;
     const entry = this.terminals.get(this.activeSessionId);
-    if (!entry) return;
-    const dims = entry.fitAddon.proposeDimensions();
-    const cols = dims?.cols ?? 120;
-    const rows = dims?.rows ?? 30;
-    console.log('[CSM] sendResize:', { cols, rows, hasDims: !!dims });
+    if (entry) {
+      const dims = entry.fitAddon.proposeDimensions();
+      cols = dims?.cols ?? 120;
+      rows = dims?.rows ?? 30;
+    }
+    console.log('[CSM] sendResize:', { cols, rows, hasEntry: !!entry });
     this.ws.send(JSON.stringify({ type: 'resize', cols, rows }));
   }
 

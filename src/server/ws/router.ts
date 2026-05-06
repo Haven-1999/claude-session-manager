@@ -92,6 +92,12 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
       ws.send(JSON.stringify({ type: 'output', data: history.join('') }));
     }
 
+    // Eagerly spawn PTY if not already running so the user sees output immediately
+    if (!session.ptyProcess && session.status !== 'stopped') {
+      console.log(`[CSM WS] Eagerly spawning PTY for session ${session.id}`);
+      ensurePty();
+    }
+
     let heartbeatTimer: NodeJS.Timeout;
     const resetHeartbeat = () => {
       clearTimeout(heartbeatTimer);
