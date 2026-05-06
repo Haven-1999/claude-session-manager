@@ -321,8 +321,19 @@ class App {
       if (this.ws !== ws || this.activeSessionId !== sessionId) return;
       this.hideOverlay();
       this.reconnectDelay = 1000;
-      this.sendResize();
-      this.startHeartbeat();
+      // Ensure terminal dimensions are correct before telling PTY
+      const entry = this.terminals.get(sessionId);
+      if (entry) {
+        requestAnimationFrame(() => {
+          if (this.ws !== ws || this.activeSessionId !== sessionId) return;
+          entry.fitAddon.fit();
+          this.sendResize();
+          this.startHeartbeat();
+        });
+      } else {
+        this.sendResize();
+        this.startHeartbeat();
+      }
     };
 
     ws.onmessage = (event) => {

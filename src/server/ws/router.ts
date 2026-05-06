@@ -26,15 +26,25 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
       return;
     }
 
-    // Spawn PTY if not running
-    if (!session.ptyProcess && session.status !== 'stopped') {
+    let pendingInput: string[] = [];
+    let pendingResize: { cols: number; rows: number } | null = null;
+
+    const ensurePty = (): boolean => {
+      if (session!.ptyProcess) return true;
+      if (session!.status === 'stopped') return false;
+
+      const cols = pendingResize?.cols ?? 120;
+      const rows = pendingResize?.rows ?? 30;
+
       try {
         const pty = spawnPty({
-          cwd: session.cwd,
-          sessionId: session.id,
+          cwd: session!.cwd,
+          sessionId: session!.id,
           claudePath,
+          cols,
+          rows,
         });
-        session.ptyProcess = pty;
+        session!.ptyProcess = pty;
         pty.onData((data) => {
           broadcastToSession(session!, data);
         });
@@ -43,15 +53,28 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
           manager.updateStatus(session!.id, 'stopped');
           broadcastStatus(session!);
         });
+
+        // Flush any pending resize
+        if (pendingResize) {
+          pty.resize(pendingResize.cols, pendingResize.rows);
+          pendingResize = null;
+        }
+
+        // Flush any pending input
+        for (const data of pendingInput) {
+          pty.write(data);
+        }
+        pendingInput = [];
+
+        return true;
       } catch (err) {
         ws.close(1011, 'Failed to spawn PTY');
-        return;
+        return false;
       }
-    }
+    };
 
     manager.attachClient(sessionId, ws);
     broadcastStatus(session);
-
     ws.send(JSON.stringify({ type: 'status', status: session.status }));
 
     let heartbeatTimer: NodeJS.Timeout;
@@ -67,10 +90,22 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
       resetHeartbeat();
       try {
         const msg: WsMessage = JSON.parse(raw.toString());
-        if (msg.type === 'input' && msg.data && session!.ptyProcess) {
-          session!.ptyProcess.write(msg.data);
-        } else if (msg.type === 'resize' && session!.ptyProcess) {
-          session!.ptyProcess.resize(msg.cols || 120, msg.rows || 30);
+        if (msg.type === 'input' && msg.data) {
+          if (session!.ptyProcess) {
+            session!.ptyProcess.write(msg.data);
+          } else {
+            pendingInput.push(msg.data);
+            ensurePty();
+          }
+        } else if (msg.type === 'resize') {
+          const cols = msg.cols ?? 120;
+          const rows = msg.rows ?? 30;
+          pendingResize = { cols, rows };
+          if (session!.ptyProcess) {
+            session!.ptyProcess.resize(cols, rows);
+          } else {
+            ensurePty();
+          }
         } else if (msg.type === 'ping') {
           ws.send(JSON.stringify({ type: 'pong' }));
         }
