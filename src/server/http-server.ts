@@ -13,7 +13,7 @@ export interface ServerOptions {
   auth?: string;
 }
 
-export function createHttpServer(manager: SessionManager, options: Pick<ServerOptions, 'claudePath' | 'auth'>): http.Server {
+export function createHttpServer(manager: SessionManager, options: Pick<ServerOptions, 'claudePath' | 'auth'>): { server: http.Server; wss: WebSocketServer } {
   const app = express();
   app.use(express.json());
 
@@ -98,5 +98,5 @@ export function createHttpServer(manager: SessionManager, options: Pick<ServerOp
   const wss = new WebSocketServer({ server, path: '/ws' });
   setupWebSocketRouter(wss, manager, options.claudePath);
 
-  return server;
+  return { server, wss };
 }

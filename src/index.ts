@@ -37,7 +37,7 @@ function main(): void {
   const manager = new SessionManager(memory);
   manager.restoreSessions();
 
-  const server = createHttpServer(manager, { claudePath: opts.claudePath, auth: opts.auth });
+  const { server, wss } = createHttpServer(manager, { claudePath: opts.claudePath, auth: opts.auth });
 
   server.listen(opts.port, opts.host, () => {
     console.log(`CSM listening on http://${opts.host}:${opts.port}`);
@@ -45,10 +45,12 @@ function main(): void {
 
   const shutdown = (signal: string) => {
     console.log(`\n${signal} received, shutting down...`);
-    server.close(() => {
-      manager.listSessions().forEach((s) => manager.closeSession(s.id, true));
-      memory.close();
-      process.exit(0);
+    wss.close(() => {
+      server.close(() => {
+        manager.listSessions().forEach((s) => manager.closeSession(s.id, true));
+        memory.close();
+        process.exit(0);
+      });
     });
   };
 
