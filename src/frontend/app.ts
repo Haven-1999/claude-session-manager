@@ -306,6 +306,7 @@ class App {
   }
 
   private connect(sessionId: string): void {
+    if (this.activeSessionId !== sessionId) return;
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws?sessionId=${sessionId}`;
     this.ws = new WebSocket(wsUrl);
@@ -355,14 +356,25 @@ class App {
       this.reconnectTimer = null;
     }
     if (this.ws) {
+      // Prevent onclose from triggering scheduleReconnect for a manually-closed ws
+      this.ws.onclose = null;
+      this.ws.onerror = null;
       this.ws.close();
       this.ws = null;
     }
   }
 
   private scheduleReconnect(sessionId: string): void {
+    // Don't reconnect if user has already switched to a different session
+    if (this.activeSessionId !== sessionId) {
+      return;
+    }
     this.showOverlay(`Disconnected. Reconnecting in ${this.reconnectDelay / 1000}s...`);
     this.reconnectTimer = window.setTimeout(() => {
+      if (this.activeSessionId !== sessionId) {
+        this.hideOverlay();
+        return;
+      }
       this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30000);
       this.connect(sessionId);
     }, this.reconnectDelay);
