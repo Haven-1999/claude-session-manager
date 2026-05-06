@@ -24,12 +24,18 @@
       </div>
     </header>
     <div class="main-layout">
-      <aside id="session-list" class="sidebar left"></aside>
+      <aside id="session-list" class="sidebar left">
+        <div class="sidebar-header">Sessions</div>
+        <div class="session-list-content" id="session-list-content"></div>
+      </aside>
       <main id="terminal-panel" class="terminal-area">
         <div id="terminal-container"></div>
         <div id="connection-overlay" class="hidden"></div>
       </main>
-      <aside id="session-info" class="sidebar right collapsed"></aside>
+      <aside id="session-info" class="sidebar right">
+        <div class="sidebar-header">Details</div>
+        <div class="info-panel" id="session-info-content"></div>
+      </aside>
     </div>
   </div>
   <script type="module" src="app.js"></script>
