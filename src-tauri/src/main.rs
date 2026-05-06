@@ -5,9 +5,12 @@ mod config;
 mod tunnel;
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::command;
 use tauri::Manager;
+
+static CSM_WINDOW_OPENING: AtomicBool = AtomicBool::new(false);
 
 #[command]
 fn open_settings(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<(), String> {
@@ -28,9 +31,14 @@ fn open_settings(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<
 #[command]
 fn open_csm_window(app: tauri::AppHandle, url: String) -> Result<(), String> {
     println!("[TAURI] open_csm_window called with url: {}", url);
+    // Prevent concurrent calls from multiple threads (e.g., auto-start + setup page)
+    if CSM_WINDOW_OPENING.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_err() {
+        println!("[TAURI] Another open_csm_window is already in progress, skipping");
+        return Ok(());
+    }
     if let Some(existing) = app.get_webview_window("csm") {
-        println!("[TAURI] Closing existing csm window");
-        let _ = existing.close();
+        println!("[TAURI] Existing csm window found, skipping");
+        return Ok(());
     }
     let parsed = tauri::Url::parse(&url).map_err(|e| e.to_string())?;
     println!("[TAURI] Parsed URL: {:?}", parsed);
