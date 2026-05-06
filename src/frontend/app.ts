@@ -159,6 +159,8 @@ class App {
     // Hide all terminals
     for (const [, entry] of this.terminals) {
       entry.container.classList.remove('active');
+      entry.container.style.display = 'none';
+      entry.container.style.zIndex = '';
     }
 
     let entry = this.terminals.get(sessionId);
@@ -168,6 +170,8 @@ class App {
     }
 
     entry.container.classList.add('active');
+    entry.container.style.display = 'block';
+    entry.container.style.zIndex = '1';
     requestAnimationFrame(() => {
       entry!.fitAddon.fit();
       requestAnimationFrame(() => {
@@ -387,8 +391,10 @@ class App {
       this.hideOverlay();
       this.reconnectDelay = 1000;
       this.updateSessionStatus(sessionId, 'running');
+      // Clear terminal before receiving history to avoid content duplication
       const entry = this.terminals.get(sessionId);
       if (entry) {
+        entry.terminal.clear();
         requestAnimationFrame(() => {
           if (this.ws !== ws || this.activeSessionId !== sessionId) return;
           entry.fitAddon.fit();

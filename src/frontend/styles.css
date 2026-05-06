@@ -239,6 +239,7 @@ html, body, #app {
 
 .terminal-panel.active {
   display: block;
+  z-index: 1;
 }
 
 .terminal-panel .xterm {
