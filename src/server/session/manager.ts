@@ -4,6 +4,7 @@ import type WebSocket from 'ws';
 
 export class SessionManager {
   private sessions = new Map<string, Session>();
+  onStatusChange?: (id: string, status: SessionStatus) => void;
 
   constructor(private memory: MemoryService) {}
 
@@ -62,6 +63,7 @@ export class SessionManager {
     if (s.clients.size === 0 && s.status === 'running') {
       s.status = 'disconnected';
       this.memory.updateSession(id, { status: 'disconnected' });
+      this.onStatusChange?.(id, 'disconnected');
     }
   }
 
@@ -76,6 +78,14 @@ export class SessionManager {
     s.clients.clear();
     s.status = 'stopped';
     this.memory.updateSession(id, { status: 'stopped' });
+  }
+
+  appendOutput(id: string, data: string): void {
+    this.memory.appendOutput(id, data);
+  }
+
+  getOutputHistory(id: string): string[] {
+    return this.memory.getOutputHistory(id);
   }
 
   restoreSessions(): void {

@@ -380,3 +380,179 @@ html, body, #app {
 .modal-actions .btn-secondary:hover {
   background: var(--bg-hover);
 }
+
+/* Code Editor Sidebar */
+#code-editor {
+  width: 480px;
+  min-width: 200px;
+  max-width: 800px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+#code-editor.hidden {
+  width: 0;
+  min-width: 0;
+  border: none;
+  overflow: hidden;
+}
+
+.resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  z-index: 10;
+}
+
+.resize-handle:hover,
+.resize-handle.dragging {
+  background: var(--accent);
+}
+
+.code-editor-content {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.code-editor-panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.code-editor-panel.hidden {
+  display: none;
+}
+
+.code-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  gap: 0;
+}
+
+.code-editor-tabs {
+  display: flex;
+  flex: 1;
+  overflow-x: auto;
+  gap: 0;
+}
+
+.code-editor-tabs::-webkit-scrollbar { height: 4px; }
+.code-editor-tabs::-webkit-scrollbar-track { background: transparent; }
+.code-editor-tabs::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 2px; }
+
+.code-editor-tab {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--fg-secondary);
+  cursor: pointer;
+  border-right: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+  user-select: none;
+}
+
+.code-editor-tab:hover {
+  background: var(--bg-hover);
+}
+
+.code-editor-tab.active {
+  background: var(--bg-tertiary);
+  color: var(--fg-primary);
+  border-bottom: 2px solid var(--accent);
+}
+
+.tab-close {
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+  border-radius: 3px;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.tab-close:hover {
+  color: var(--error);
+  background: rgba(248, 81, 73, 0.1);
+}
+
+.code-editor-path {
+  font-size: 11px;
+  color: var(--fg-muted);
+  padding: 4px 12px;
+  font-family: 'Menlo', monospace;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.code-editor-actions {
+  display: flex;
+  gap: 6px;
+  padding: 6px 12px;
+  flex-shrink: 0;
+}
+
+.code-editor-actions button {
+  background: var(--bg-tertiary);
+  color: var(--fg-primary);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.code-editor-actions button:hover {
+  background: var(--bg-hover);
+}
+
+.code-editor-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.code-editor-save {
+  background: var(--accent) !important;
+  color: #fff !important;
+  border-color: var(--accent) !important;
+}
+
+.code-editor-save:hover:not(:disabled) {
+  background: var(--accent-hover) !important;
+}
+
+.code-editor-body {
+  flex: 1;
+  overflow: hidden;
+  background: #0d1117;
+}
+
+/* Terminal link hover styling */
+.xterm-decoration-container .xterm-decoration-file-link {
+  text-decoration: underline;
+  cursor: pointer;
+  color: #58a6ff !important;
+}
+
+.xterm-decoration-container .xterm-decoration-file-link:hover {
+  background: rgba(88, 166, 255, 0.15);
+}

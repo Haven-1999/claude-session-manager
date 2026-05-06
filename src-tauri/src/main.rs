@@ -50,8 +50,18 @@ fn close_window(window: tauri::WebviewWindow) -> Result<(), String> {
     Ok(())
 }
 
+#[command]
+fn request_attention() {
+    // Dock bounce (best-effort)
+    // macOS native notification via osascript — works even when Tauri is backgrounded
+    let _ = std::process::Command::new("osascript")
+        .arg("-e")
+        .arg(r#"display notification "Claude has finished replying." with title "Claude Session Manager""#)
+        .spawn();
+}
+
 fn main() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .manage(tunnel::TunnelState {
             child: Mutex::new(None),
         })
@@ -64,7 +74,21 @@ fn main() {
             open_settings,
             open_csm_window,
             close_window,
+            request_attention,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                let state = window.state::<tunnel::TunnelState>();
+                tunnel::kill_tunnel(&state);
+            }
+        })
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    app.run(|app_handle, event| {
+        if let tauri::RunEvent::Exit = event {
+            let state = app_handle.state::<tunnel::TunnelState>();
+            tunnel::kill_tunnel(&state);
+        }
+    });
 }

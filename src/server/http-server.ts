@@ -4,6 +4,7 @@ import * as path from 'path';
 import { WebSocketServer } from 'ws';
 import type { SessionManager } from './session/manager';
 import { setupWebSocketRouter } from './ws/router';
+import { FileService } from './file/service';
 
 export interface ServerOptions {
   port: number;
@@ -85,6 +86,46 @@ export function createHttpServer(manager: SessionManager, options: Pick<ServerOp
   app.get('/api/cwd-suggestions', (_req, res) => {
     // TODO: implement via MemoryService if needed; stub for now
     res.json([]);
+  });
+
+  const fileService = new FileService();
+
+  app.get('/api/files', (req, res) => {
+    const filePath = req.query.path as string;
+    if (!filePath || typeof filePath !== 'string') {
+      return res.status(400).json({ error: 'path query parameter is required' });
+    }
+    try {
+      const result = fileService.readFile(filePath);
+      if (!result.exists) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+      if (result.tooLarge) {
+        return res.status(413).json({ error: 'File too large (max 1MB)' });
+      }
+      if (result.isBinary) {
+        return res.status(415).json({ error: 'Binary files cannot be edited' });
+      }
+      res.json({ content: result.content, path: filePath });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.patch('/api/files', (req, res) => {
+    const { path: filePath, content } = req.body;
+    if (!filePath || typeof filePath !== 'string') {
+      return res.status(400).json({ error: 'path is required' });
+    }
+    if (typeof content !== 'string') {
+      return res.status(400).json({ error: 'content is required' });
+    }
+    try {
+      fileService.writeFile(filePath, content);
+      res.json({ saved: true, path: filePath });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   // Static files

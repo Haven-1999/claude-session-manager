@@ -18,6 +18,23 @@ fn ssh_log_path(app: &AppHandle) -> PathBuf {
         .join("csm-ssh.log")
 }
 
+fn kill_child_group(child: &mut Child) {
+    let pid = child.id() as i32;
+    let _ = child.kill();
+    let _ = child.wait();
+    // Ensure the entire process group is terminated (SSH may fork children)
+    unsafe {
+        let _ = libc::kill(-pid, libc::SIGKILL);
+    }
+}
+
+pub fn kill_tunnel(state: &TunnelState) {
+    let mut guard = state.child.lock().unwrap();
+    if let Some(mut child) = guard.take() {
+        kill_child_group(&mut child);
+    }
+}
+
 #[command]
 pub fn start_tunnel(
     config: AppConfig,
@@ -28,7 +45,7 @@ pub fn start_tunnel(
     {
         let mut guard = state.child.lock().map_err(|e| e.to_string())?;
         if let Some(mut child) = guard.take() {
-            let _ = child.kill();
+            kill_child_group(&mut child);
         }
     }
 
@@ -64,6 +81,15 @@ pub fn start_tunnel(
     cmd.arg(format!("{}@{}", config.ssh_user, config.ssh_host));
     cmd.stdout(Stdio::null()).stderr(Stdio::from(log_file));
 
+    // Run SSH in its own process group so we can kill the whole tree
+    unsafe {
+        use std::os::unix::process::CommandExt;
+        cmd.pre_exec(|| {
+            libc::setpgid(0, 0);
+            Ok(())
+        });
+    }
+
     let child = cmd
         .spawn()
         .map_err(|e| format!("Failed to start ssh tunnel: {}", e))?;
@@ -92,10 +118,7 @@ pub fn start_tunnel(
 
 #[command]
 pub fn stop_tunnel(state: State<TunnelState>) -> Result<(), String> {
-    let mut guard = state.child.lock().map_err(|e| e.to_string())?;
-    if let Some(mut child) = guard.take() {
-        let _ = child.kill();
-    }
+    kill_tunnel(&state);
     Ok(())
 }
 

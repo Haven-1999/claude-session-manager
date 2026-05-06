@@ -1,0 +1,57 @@
+import type { Terminal } from 'xterm';
+
+// Matches absolute Unix paths.
+// Supports:
+//   /data/repo/src/main.rs
+//   /tmp
+//   "/path/with spaces/file.txt"
+//   '/path/with spaces/file.txt'
+const FILE_PATH_REGEX = /(?:^|[^\w\-\/])("(\/[\w\-\.\/\s]+)"|'(\/[\w\-\.\/\s]+)'|(\/\S*?[\w\-\.]+(?:\/[\w\-\.\/]+)?))/g;
+
+export class FileLinkProvider {
+  private terminal: Terminal;
+  private onOpenFile: (path: string) => void;
+
+  constructor(terminal: Terminal, onOpenFile: (path: string) => void) {
+    this.terminal = terminal;
+    this.onOpenFile = onOpenFile;
+  }
+
+  provideLinks(
+    y: number,
+    callback: (links: any[] | undefined) => void
+  ): void {
+    const term = this.terminal as any;
+    const line = term.buffer.active.getLine(y - 1);
+    if (!line) {
+      callback(undefined);
+      return;
+    }
+
+    const text = line.translateToString(true);
+    const links: any[] = [];
+    let match: RegExpExecArray | null;
+
+    // Reset regex
+    FILE_PATH_REGEX.lastIndex = 0;
+    while ((match = FILE_PATH_REGEX.exec(text)) !== null) {
+      const fullMatch = match[0];
+      // match[2] = double-quoted path, match[3] = single-quoted, match[4] = unquoted
+      const path = match[2] || match[3] || match[4];
+      if (!path) continue;
+      const startIndex = match.index + fullMatch.indexOf(path);
+      const endIndex = startIndex + path.length;
+
+      const start = { x: startIndex + 1, y };
+      const end = { x: endIndex + 1, y };
+
+      links.push({
+        text: path,
+        range: { start, end },
+        activate: (_event: MouseEvent, _text: string) => this.onOpenFile(path),
+      });
+    }
+
+    callback(links.length > 0 ? links : undefined);
+  }
+}

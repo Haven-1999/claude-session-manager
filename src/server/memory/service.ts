@@ -17,6 +17,14 @@ export class MemoryService {
       );
       CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
       CREATE INDEX IF NOT EXISTS idx_sessions_cwd ON sessions(cwd);
+
+      CREATE TABLE IF NOT EXISTS output_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT NOT NULL,
+        data TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_output_session ON output_log(session_id);
     `);
   }
 
@@ -68,6 +76,19 @@ export class MemoryService {
 
   loadNonStoppedSessions(): SessionRecord[] {
     return this.db.prepare(`SELECT * FROM sessions WHERE status != 'stopped' ORDER BY last_active_at DESC`).all() as SessionRecord[];
+  }
+
+  appendOutput(sessionId: string, data: string): void {
+    this.db.prepare(
+      `INSERT INTO output_log (session_id, data, created_at) VALUES (?, ?, ?)`
+    ).run(sessionId, data, Date.now());
+  }
+
+  getOutputHistory(sessionId: string, limit = 10000): string[] {
+    const rows = this.db.prepare(
+      `SELECT data FROM output_log WHERE session_id = ? ORDER BY created_at DESC LIMIT ?`
+    ).all(sessionId, limit) as { data: string }[];
+    return rows.map(r => r.data).reverse();
   }
 
   close(): void {

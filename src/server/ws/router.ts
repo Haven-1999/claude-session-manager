@@ -12,6 +12,11 @@ interface WsMessage {
 }
 
 export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManager, claudePath: string): void {
+  manager.onStatusChange = (id, status) => {
+    const session = manager.getSession(id);
+    if (session) broadcastStatus(session);
+  };
+
   wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
     const url = new URL(req.url || '/', `http://${req.headers.host}`);
     const sessionId = url.searchParams.get('sessionId');
@@ -46,6 +51,7 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
         });
         session!.ptyProcess = pty;
         pty.onData((data) => {
+          manager.appendOutput(session!.id, data);
           broadcastToSession(session!, data);
         });
         pty.onExit(({ exitCode }) => {
@@ -76,6 +82,12 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
     manager.attachClient(sessionId, ws);
     broadcastStatus(session);
     ws.send(JSON.stringify({ type: 'status', status: session.status }));
+
+    // Send output history so reconnecting clients see prior context
+    const history = manager.getOutputHistory(sessionId);
+    if (history.length > 0) {
+      ws.send(JSON.stringify({ type: 'output', data: history.join('') }));
+    }
 
     let heartbeatTimer: NodeJS.Timeout;
     const resetHeartbeat = () => {

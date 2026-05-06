@@ -2,6 +2,8 @@ import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import { SessionList } from './components/session-list.js';
 import { SessionInfo } from './components/session-info.js';
+import { CodeEditorPanel } from './components/code-editor.js';
+import { FileLinkProvider } from './components/file-link-provider.js';
 
 interface SessionSummary {
   id: string;
@@ -30,6 +32,10 @@ class App {
   private sessionInfo: SessionInfo;
   private isTauri: boolean;
   private heartbeatTimer: number | null = null;
+  private notificationTimer: number | null = null;
+  private windowFocused = true;
+  private resizeDebounceTimer: number | null = null;
+  private codeEditor: CodeEditorPanel;
 
   constructor() {
     this.isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__;
@@ -43,9 +49,37 @@ class App {
 
     this.sessionInfo = new SessionInfo(document.getElementById('session-info-content')!);
 
+    this.codeEditor = new CodeEditorPanel(document.getElementById('code-editor-content')!);
+    this.codeEditor.onSave = async (path, content) => {
+      try {
+        const res = await fetch('/api/files', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path, content }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+          alert('Failed to save file: ' + (err.error || res.statusText));
+          return;
+        }
+        console.log('[CSM] Saved file:', path);
+      } catch (e) {
+        console.error('Save file error:', e);
+        alert('Error saving file. Check console.');
+      }
+    };
+
+    this.setupEditorResize();
+
     window.addEventListener('resize', () => {
-      requestAnimationFrame(() => this.fitActiveTerminal());
+      if (this.resizeDebounceTimer) clearTimeout(this.resizeDebounceTimer);
+      this.resizeDebounceTimer = window.setTimeout(() => {
+        this.resizeDebounceTimer = null;
+        this.fitActiveTerminal();
+      }, 150);
     });
+    window.addEventListener('blur', () => { this.windowFocused = false; });
+    window.addEventListener('focus', () => { this.windowFocused = true; });
 
     document.getElementById('btn-new')!.addEventListener('click', () => this.showCreateModal());
 
@@ -60,6 +94,10 @@ class App {
     }
 
     this.loadSessions();
+
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
   }
 
   private createTerminal(sessionId: string): TerminalEntry {
@@ -98,6 +136,9 @@ class App {
     });
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
+    (terminal as any).registerLinkProvider(new FileLinkProvider(terminal, (filePath) => {
+      this.openFileInEditor(filePath);
+    }));
     terminal.open(container);
     fitAddon.fit();
 
@@ -125,9 +166,11 @@ class App {
     entry.container.classList.add('active');
     requestAnimationFrame(() => {
       entry!.fitAddon.fit();
-      if (this.activeSessionId === sessionId) {
-        this.sendResize();
-      }
+      requestAnimationFrame(() => {
+        if (this.activeSessionId === sessionId) {
+          this.sendResize();
+        }
+      });
     });
     return entry;
   }
@@ -321,6 +364,8 @@ class App {
       if (this.ws !== ws || this.activeSessionId !== sessionId) return;
       this.hideOverlay();
       this.reconnectDelay = 1000;
+      // Force status to running since we are connected
+      this.updateSessionStatus(sessionId, 'running');
       // Ensure terminal dimensions are correct before telling PTY
       const entry = this.terminals.get(sessionId);
       if (entry) {
@@ -345,6 +390,12 @@ class App {
           if (entry) {
             entry.terminal.write(msg.data);
           }
+          // Defensive: if we are receiving output, we must be connected
+          const s = this.sessions.find((x) => x.id === sessionId);
+          if (s && s.status === 'disconnected') {
+            this.updateSessionStatus(sessionId, 'running');
+          }
+          this.scheduleNotification();
         } else if (msg.type === 'status') {
           this.updateSessionStatus(sessionId, msg.status);
         } else if (msg.type === 'pong') {
@@ -423,11 +474,46 @@ class App {
     }
   }
 
+  private scheduleNotification(): void {
+    if (this.notificationTimer) {
+      clearTimeout(this.notificationTimer);
+      this.notificationTimer = null;
+    }
+    this.notificationTimer = window.setTimeout(() => {
+      this.notificationTimer = null;
+      const hidden = document.visibilityState === 'hidden' || !this.windowFocused;
+      if (hidden) {
+        if (Notification.permission === 'granted') {
+          try {
+            new Notification('Claude Session Manager', {
+              body: 'Claude has finished replying.',
+            });
+          } catch {
+            // Web Notification may not work in Tauri WebView
+          }
+        }
+        if (this.isTauri) {
+          try {
+            const tauri = (window as any).__TAURI__;
+            if (tauri?.core?.invoke) {
+              tauri.core.invoke('request_attention');
+            }
+          } catch (e) {
+            console.error('request_attention error:', e);
+          }
+        }
+      }
+    }, 3000);
+  }
+
   private updateSessionStatus(id: string, status: string): void {
     const s = this.sessions.find((x) => x.id === id);
     if (s) {
       s.status = status as any;
       this.sessionList.render(this.sessions, this.activeSessionId);
+      if (this.activeSessionId === id) {
+        this.sessionInfo.render(s);
+      }
     }
   }
 
@@ -439,6 +525,56 @@ class App {
 
   private hideOverlay(): void {
     document.getElementById('connection-overlay')!.classList.add('hidden');
+  }
+
+  private async openFileInEditor(filePath: string): Promise<void> {
+    try {
+      const res = await fetch(`/api/files?path=${encodeURIComponent(filePath)}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+        alert('Failed to open file: ' + (err.error || res.statusText));
+        return;
+      }
+      const data = await res.json();
+      await this.codeEditor.open(data.path, data.content);
+      document.getElementById('code-editor')!.classList.remove('hidden');
+    } catch (e) {
+      console.error('Open file error:', e);
+      alert('Error opening file. Check console.');
+    }
+  }
+
+  private setupEditorResize(): void {
+    const handle = document.getElementById('editor-resize-handle')!;
+    const sidebar = document.getElementById('code-editor')!;
+    let isDragging = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    handle.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      startX = e.clientX;
+      startWidth = sidebar.offsetWidth;
+      handle.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const delta = startX - e.clientX;
+      const newWidth = Math.min(Math.max(startWidth + delta, 200), 800);
+      sidebar.style.width = `${newWidth}px`;
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (!isDragging) return;
+      isDragging = false;
+      handle.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      this.fitActiveTerminal();
+    });
   }
 
   private async openSettings(): Promise<void> {
