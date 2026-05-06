@@ -76,8 +76,8 @@ export class SessionManager {
     }
     s.clients.forEach(ws => ws.close());
     s.clients.clear();
-    s.status = 'stopped';
-    this.memory.updateSession(id, { status: 'stopped' });
+    this.sessions.delete(id);
+    this.memory.deleteSession(id);
   }
 
   shutdown(): void {

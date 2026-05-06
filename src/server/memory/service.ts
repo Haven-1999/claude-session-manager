@@ -66,6 +66,7 @@ export class MemoryService {
   }
 
   deleteSession(id: string): void {
+    this.db.prepare(`DELETE FROM output_log WHERE session_id = ?`).run(id);
     this.db.prepare(`DELETE FROM sessions WHERE id = ?`).run(id);
   }
 
