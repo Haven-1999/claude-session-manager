@@ -23,6 +23,7 @@ class App {
   private sessionList: SessionList;
   private sessionInfo: SessionInfo;
   private isTauri: boolean;
+  private onDataDisposable: { dispose: () => void } | null = null;
 
   constructor() {
     this.isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__;
@@ -119,6 +120,7 @@ class App {
   private switchSession(id: string): void {
     if (this.currentSessionId === id) return;
     this.disconnect();
+    this.terminal.clear();
     this.currentSessionId = id;
     this.sessionList.render(this.sessions, id);
     const session = this.sessions.find((s) => s.id === id);
@@ -197,6 +199,7 @@ class App {
       const session: SessionSummary = await res.json();
       this.sessions.unshift(session);
       this.sessionList.render(this.sessions, this.currentSessionId);
+      this.terminal.clear();
       this.switchSession(session.id);
     } catch (e) {
       console.error('createNewSession error:', e);
@@ -286,7 +289,7 @@ class App {
       this.ws?.close();
     };
 
-    this.terminal.onData((data) => {
+    this.onDataDisposable = this.terminal.onData((data) => {
       if (this.ws?.readyState === WebSocket.OPEN) {
         this.ws.send(JSON.stringify({ type: 'input', data }));
       }
@@ -298,6 +301,10 @@ class App {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
+    }
+    if (this.onDataDisposable) {
+      this.onDataDisposable.dispose();
+      this.onDataDisposable = null;
     }
     if (this.ws) {
       this.ws.close();

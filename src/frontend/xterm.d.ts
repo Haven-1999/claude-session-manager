@@ -4,7 +4,7 @@ declare module 'xterm' {
     loadAddon(addon: any): void;
     open(element: HTMLElement): void;
     write(data: string | Uint8Array): void;
-    onData(callback: (data: string) => void): void;
+    onData(callback: (data: string) => void): { dispose: () => void };
     resize(cols: number, rows: number): void;
     clear(): void;
   }
