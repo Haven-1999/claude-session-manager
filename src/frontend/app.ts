@@ -36,9 +36,13 @@ class App {
   private windowFocused = true;
   private resizeDebounceTimer: number | null = null;
   private codeEditor: CodeEditorPanel;
+  private debugEl: HTMLElement;
+  private debugLines: string[] = [];
 
   constructor() {
     this.isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__;
+    this.debugEl = document.getElementById('debug-panel')!;
+    this.logDebug('App starting...');
 
     this.sessionList = new SessionList(document.getElementById('session-list-content')!, {
       onSelect: (id) => this.switchSession(id),
@@ -362,12 +366,10 @@ class App {
 
     ws.onopen = () => {
       if (this.ws !== ws || this.activeSessionId !== sessionId) return;
-      console.log('[CSM] WebSocket open for session', sessionId);
+      this.logDebug(`WS open: ${sessionId}`);
       this.hideOverlay();
       this.reconnectDelay = 1000;
-      // Force status to running since we are connected
       this.updateSessionStatus(sessionId, 'running');
-      // Always send resize so backend spawns PTY even if terminal isn't ready yet
       const entry = this.terminals.get(sessionId);
       if (entry) {
         requestAnimationFrame(() => {
@@ -380,6 +382,15 @@ class App {
         this.sendResize();
         this.startHeartbeat();
       }
+      // Retry resize a few times in case backend missed the first one
+      for (let i = 1; i <= 3; i++) {
+        setTimeout(() => {
+          if (this.ws === ws && this.activeSessionId === sessionId) {
+            this.logDebug(`Retry resize #${i}`);
+            this.sendResize();
+          }
+        }, i * 800);
+      }
     };
 
     ws.onmessage = (event) => {
@@ -387,19 +398,18 @@ class App {
       try {
         const msg = JSON.parse(event.data);
         if (msg.type === 'output') {
-          console.log('[CSM] output received, length:', msg.data?.length || 0);
+          this.logDebug(`output: ${msg.data?.length || 0} chars`);
           const entry = this.terminals.get(sessionId);
           if (entry) {
             entry.terminal.write(msg.data);
           }
-          // Defensive: if we are receiving output, we must be connected
           const s = this.sessions.find((x) => x.id === sessionId);
           if (s && s.status === 'disconnected') {
             this.updateSessionStatus(sessionId, 'running');
           }
           this.scheduleNotification();
         } else if (msg.type === 'status') {
-          console.log('[CSM] status received:', msg.status);
+          this.logDebug(`status: ${msg.status}`);
           this.updateSessionStatus(sessionId, msg.status);
         } else if (msg.type === 'pong') {
           // heartbeat ok
@@ -410,11 +420,13 @@ class App {
     };
 
     ws.onclose = () => {
+      this.logDebug('WS close');
       this.stopHeartbeat();
       this.scheduleReconnect(sessionId);
     };
 
-    ws.onerror = () => {
+    ws.onerror = (e) => {
+      this.logDebug('WS error');
       ws.close();
     };
   }
@@ -453,7 +465,10 @@ class App {
   }
 
   private sendResize(): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN || !this.activeSessionId) return;
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN || !this.activeSessionId) {
+      this.logDebug('sendResize skipped: ws not ready');
+      return;
+    }
     let cols = 120;
     let rows = 30;
     const entry = this.terminals.get(this.activeSessionId);
@@ -462,7 +477,7 @@ class App {
       cols = dims?.cols ?? 120;
       rows = dims?.rows ?? 30;
     }
-    console.log('[CSM] sendResize:', { cols, rows, hasEntry: !!entry });
+    this.logDebug(`sendResize: ${cols}x${rows} (hasEntry=${!!entry})`);
     this.ws.send(JSON.stringify({ type: 'resize', cols, rows }));
   }
 
@@ -582,6 +597,15 @@ class App {
       document.body.style.userSelect = '';
       this.fitActiveTerminal();
     });
+  }
+
+  private logDebug(msg: string): void {
+    const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    this.debugLines.push(line);
+    if (this.debugLines.length > 20) this.debugLines.shift();
+    if (this.debugEl) {
+      this.debugEl.textContent = this.debugLines.join('\n');
+    }
   }
 
   private async openSettings(): Promise<void> {

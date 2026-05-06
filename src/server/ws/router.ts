@@ -35,8 +35,14 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
     let pendingResize: { cols: number; rows: number } | null = null;
 
     const ensurePty = (): boolean => {
-      if (session!.ptyProcess) return true;
-      if (session!.status === 'stopped') return false;
+      if (session!.ptyProcess) {
+        console.log(`[CSM WS] ensurePty: already running for ${session!.id}`);
+        return true;
+      }
+      if (session!.status === 'stopped') {
+        console.log(`[CSM WS] ensurePty: session ${session!.id} is stopped, refusing to spawn`);
+        return false;
+      }
 
       const cols = pendingResize?.cols ?? 120;
       const rows = pendingResize?.rows ?? 30;

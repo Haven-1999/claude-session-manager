@@ -546,6 +546,25 @@ html, body, #app {
   background: #0d1117;
 }
 
+/* Debug Panel */
+.debug-panel {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(13, 17, 23, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-family: 'Menlo', monospace;
+  color: var(--fg-secondary);
+  max-width: 320px;
+  z-index: 50;
+  line-height: 1.5;
+  pointer-events: none;
+  white-space: pre-wrap;
+}
+
 /* Terminal link hover styling */
 .xterm-decoration-container .xterm-decoration-file-link {
   text-decoration: underline;
