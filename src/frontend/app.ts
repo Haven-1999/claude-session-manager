@@ -44,7 +44,7 @@ class App {
     this.sessionInfo = new SessionInfo(document.getElementById('session-info-content')!);
 
     window.addEventListener('resize', () => {
-      this.fitActiveTerminal();
+      requestAnimationFrame(() => this.fitActiveTerminal());
     });
 
     document.getElementById('btn-new')!.addEventListener('click', () => this.showCreateModal());
@@ -72,9 +72,7 @@ class App {
     const terminal = new Terminal({
       cursorBlink: true,
       fontSize: 14,
-      fontFamily: '"JetBrains Mono", "Fira Code", Menlo, Monaco, "Courier New", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", monospace',
-      allowProposedApi: true,
-      unicodeVersion: '11',
+      fontFamily: 'Menlo, Monaco, "Courier New", "PingFang SC", monospace',
       theme: {
         background: '#0d1117',
         foreground: '#e6edf3',
@@ -125,7 +123,12 @@ class App {
     }
 
     entry.container.classList.add('active');
-    entry.fitAddon.fit();
+    requestAnimationFrame(() => {
+      entry!.fitAddon.fit();
+      if (this.activeSessionId === sessionId) {
+        this.sendResize();
+      }
+    });
     return entry;
   }
 

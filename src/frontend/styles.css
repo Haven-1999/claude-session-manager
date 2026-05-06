@@ -228,16 +228,13 @@ html, body, #app {
 #terminal-panels {
   flex: 1;
   position: relative;
-  padding: 12px;
 }
 
 .terminal-panel {
   position: absolute;
-  top: 12px;
-  left: 12px;
-  right: 12px;
-  bottom: 12px;
+  inset: 0;
   display: none;
+  padding: 12px;
 }
 
 .terminal-panel.active {
@@ -245,9 +242,10 @@ html, body, #app {
 }
 
 .terminal-panel .xterm {
-  padding: 8px;
+  height: 100%;
   border-radius: var(--radius);
   background: #0d1117;
+  overflow: hidden;
 }
 
 /* Connection Overlay */
