@@ -1,12 +1,13 @@
 import type { Terminal } from 'xterm';
 
-// Matches absolute Unix paths.
+// Matches Unix file paths (absolute or relative).
 // Supports:
-//   /data/repo/src/main.rs
+//   /data/repo/src/main.rs          (absolute)
+//   src/wifi/seedpace_sources.c     (relative)
 //   /tmp
 //   "/path/with spaces/file.txt"
 //   '/path/with spaces/file.txt'
-const FILE_PATH_REGEX = /(?:^|[^\w\-\/])("(\/[\w\-\.\/\s]+)"|'(\/[\w\-\.\/\s]+)'|(\/\S*?[\w\-\.]+(?:\/[\w\-\.\/]+)?))/g;
+const FILE_PATH_REGEX = /(?:^|[^\w\-\/])("(\/[\w\-\.\/\s]+)"|'(\/[\w\-\.\/\s]+)'|(\/[\w\-\.\/]+)|([\w\-\.]+\/[\w\-\.\/]+))/g;
 
 export class FileLinkProvider {
   private terminal: Terminal;
@@ -36,8 +37,8 @@ export class FileLinkProvider {
     FILE_PATH_REGEX.lastIndex = 0;
     while ((match = FILE_PATH_REGEX.exec(text)) !== null) {
       const fullMatch = match[0];
-      // match[2] = double-quoted path, match[3] = single-quoted, match[4] = unquoted
-      const path = match[2] || match[3] || match[4];
+      // match[2] = double-quoted, match[3] = single-quoted, match[4] = absolute, match[5] = relative
+      const path = match[2] || match[3] || match[4] || match[5];
       if (!path) continue;
       const startIndex = match.index + fullMatch.indexOf(path);
       const endIndex = startIndex + path.length;

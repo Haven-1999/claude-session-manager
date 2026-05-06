@@ -567,9 +567,27 @@ class App {
   }
 
   private async openFileInEditor(filePath: string): Promise<void> {
+    let resolvedPath = filePath;
+
+    // Strategy A: resolve relative path against active session cwd
+    if (!resolvedPath.startsWith('/')) {
+      const session = this.sessions.find((s) => s.id === this.activeSessionId);
+      if (session) {
+        resolvedPath = session.cwd.replace(/\/$/, '') + '/' + resolvedPath;
+        this.logDebug(`Resolved relative path: ${filePath} -> ${resolvedPath}`);
+      }
+    }
+
     try {
-      const res = await fetch(`/api/files?path=${encodeURIComponent(filePath)}`);
+      const res = await fetch(`/api/files?path=${encodeURIComponent(resolvedPath)}`);
       if (!res.ok) {
+        if (res.status === 404) {
+          // Strategy C: prompt user to confirm/edit path
+          const userPath = await this.showPathPrompt(resolvedPath, filePath);
+          if (userPath && userPath !== resolvedPath) {
+            return this.openFileInEditor(userPath);
+          }
+        }
         const err = await res.json().catch(() => ({ error: 'Unknown error' }));
         alert('Failed to open file: ' + (err.error || res.statusText));
         return;
@@ -581,6 +599,57 @@ class App {
       console.error('Open file error:', e);
       alert('Error opening file. Check console.');
     }
+  }
+
+  private showPathPrompt(resolvedPath: string, originalPath: string): Promise<string | null> {
+    return new Promise((resolve) => {
+      const existing = document.querySelector('.modal-overlay');
+      if (existing) existing.remove();
+
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.innerHTML = `
+        <div class="modal" style="width: 520px;">
+          <h3>Resolve File Path</h3>
+          <div style="color: var(--fg-secondary); font-size: 12px; margin-bottom: 12px; line-height: 1.5;">
+            Detected: <code style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px; font-family: Menlo, monospace;">${this.escapeHtml(originalPath)}</code>
+          </div>
+          <div class="field">
+            <label>Full Path</label>
+            <input type="text" id="prompt-path" value="${this.escapeHtml(resolvedPath)}" style="font-family: Menlo, monospace;">
+          </div>
+          <div class="modal-actions">
+            <button class="btn-secondary" id="prompt-cancel">Cancel</button>
+            <button class="btn-primary" id="prompt-confirm">Open</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      const input = overlay.querySelector('#prompt-path') as HTMLInputElement;
+      input.focus();
+      input.select();
+
+      const close = (path: string | null) => {
+        overlay.remove();
+        resolve(path);
+      };
+
+      overlay.querySelector('#prompt-cancel')!.addEventListener('click', () => close(null));
+      overlay.querySelector('#prompt-confirm')!.addEventListener('click', () => close(input.value.trim()));
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) close(null);
+      });
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') close(input.value.trim());
+      });
+    });
+  }
+
+  private escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 
   private setupEditorResize(): void {
