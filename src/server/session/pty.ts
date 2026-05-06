@@ -20,6 +20,7 @@ export function spawnPty(options: PtyOptions): pty.IPty {
     cols,
     rows,
     cwd,
+    encoding: 'utf8',
     env: {
       ...process.env,
       CLAUDE_SESSION_ID: sessionId,

@@ -225,12 +225,26 @@ html, body, #app {
   background: var(--bg-primary);
 }
 
-#terminal-container {
+#terminal-panels {
   flex: 1;
+  position: relative;
   padding: 12px;
 }
 
-#terminal-container .xterm {
+.terminal-panel {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  display: none;
+}
+
+.terminal-panel.active {
+  display: block;
+}
+
+.terminal-panel .xterm {
   padding: 8px;
   border-radius: var(--radius);
   background: #0d1117;

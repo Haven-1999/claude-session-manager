@@ -12,26 +12,69 @@ interface SessionSummary {
   lastActiveAt: number;
 }
 
+interface TerminalEntry {
+  terminal: Terminal;
+  fitAddon: FitAddon;
+  container: HTMLElement;
+  onDataDisposable: { dispose: () => void } | null;
+}
+
 class App {
   private ws: WebSocket | null = null;
-  private terminal: Terminal;
-  private fitAddon: FitAddon;
+  private terminals = new Map<string, TerminalEntry>();
+  private activeSessionId: string | null = null;
   private sessions: SessionSummary[] = [];
-  private currentSessionId: string | null = null;
   private reconnectTimer: number | null = null;
   private reconnectDelay = 1000;
   private sessionList: SessionList;
   private sessionInfo: SessionInfo;
   private isTauri: boolean;
-  private onDataDisposable: { dispose: () => void } | null = null;
+  private heartbeatTimer: number | null = null;
 
   constructor() {
     this.isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__;
 
-    this.terminal = new Terminal({
+    this.sessionList = new SessionList(document.getElementById('session-list-content')!, {
+      onSelect: (id) => this.switchSession(id),
+      onNew: () => this.showCreateModal(),
+      onDelete: (id) => this.deleteSession(id),
+      onRename: (id, name) => this.renameSession(id, name),
+    });
+
+    this.sessionInfo = new SessionInfo(document.getElementById('session-info-content')!);
+
+    window.addEventListener('resize', () => {
+      this.fitActiveTerminal();
+    });
+
+    document.getElementById('btn-new')!.addEventListener('click', () => this.showCreateModal());
+
+    if (this.isTauri) {
+      const actions = document.querySelector('.actions')!;
+      const settingsBtn = document.createElement('button');
+      settingsBtn.id = 'btn-settings';
+      settingsBtn.textContent = 'Settings';
+      settingsBtn.style.marginLeft = '8px';
+      settingsBtn.addEventListener('click', () => this.openSettings());
+      actions.appendChild(settingsBtn);
+    }
+
+    this.loadSessions();
+  }
+
+  private createTerminal(sessionId: string): TerminalEntry {
+    const panels = document.getElementById('terminal-panels')!;
+    const container = document.createElement('div');
+    container.className = 'terminal-panel';
+    container.id = `terminal-panel-${sessionId}`;
+    panels.appendChild(container);
+
+    const terminal = new Terminal({
       cursorBlink: true,
       fontSize: 14,
       fontFamily: '"JetBrains Mono", "Fira Code", Menlo, Monaco, "Courier New", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", monospace',
+      allowProposedApi: true,
+      unicodeVersion: '11',
       theme: {
         background: '#0d1117',
         foreground: '#e6edf3',
@@ -55,40 +98,44 @@ class App {
         brightWhite: '#ffffff',
       },
     });
-    this.fitAddon = new FitAddon();
-    this.terminal.loadAddon(this.fitAddon);
+    const fitAddon = new FitAddon();
+    terminal.loadAddon(fitAddon);
+    terminal.open(container);
+    fitAddon.fit();
 
-    const container = document.getElementById('terminal-container')!;
-    this.terminal.open(container);
-    this.fitAddon.fit();
-
-    this.sessionList = new SessionList(document.getElementById('session-list-content')!, {
-      onSelect: (id) => this.switchSession(id),
-      onNew: () => this.showCreateModal(),
-      onDelete: (id) => this.deleteSession(id),
-      onRename: (id, name) => this.renameSession(id, name),
+    const onDataDisposable = terminal.onData((data) => {
+      if (this.ws?.readyState === WebSocket.OPEN && this.activeSessionId === sessionId) {
+        this.ws.send(JSON.stringify({ type: 'input', data }));
+      }
     });
 
-    this.sessionInfo = new SessionInfo(document.getElementById('session-info-content')!);
+    return { terminal, fitAddon, container, onDataDisposable };
+  }
 
-    window.addEventListener('resize', () => {
-      this.fitAddon.fit();
-      this.sendResize();
-    });
-
-    document.getElementById('btn-new')!.addEventListener('click', () => this.showCreateModal());
-
-    if (this.isTauri) {
-      const actions = document.querySelector('.actions')!;
-      const settingsBtn = document.createElement('button');
-      settingsBtn.id = 'btn-settings';
-      settingsBtn.textContent = 'Settings';
-      settingsBtn.style.marginLeft = '8px';
-      settingsBtn.addEventListener('click', () => this.openSettings());
-      actions.appendChild(settingsBtn);
+  private showSessionTerminal(sessionId: string): TerminalEntry {
+    // Hide all terminals
+    for (const [, entry] of this.terminals) {
+      entry.container.classList.remove('active');
     }
 
-    this.loadSessions();
+    let entry = this.terminals.get(sessionId);
+    if (!entry) {
+      entry = this.createTerminal(sessionId);
+      this.terminals.set(sessionId, entry);
+    }
+
+    entry.container.classList.add('active');
+    entry.fitAddon.fit();
+    return entry;
+  }
+
+  private fitActiveTerminal(): void {
+    if (!this.activeSessionId) return;
+    const entry = this.terminals.get(this.activeSessionId);
+    if (entry) {
+      entry.fitAddon.fit();
+      this.sendResize();
+    }
   }
 
   private async loadSessions(): Promise<void> {
@@ -103,12 +150,12 @@ class App {
       }
       this.sessions = await res.json();
       console.log('[CSM] Loaded sessions:', this.sessions.length);
-      this.sessionList.render(this.sessions, this.currentSessionId);
-      if (this.sessions.length > 0 && !this.currentSessionId) {
+      this.sessionList.render(this.sessions, this.activeSessionId);
+      if (this.sessions.length > 0 && !this.activeSessionId) {
         this.switchSession(this.sessions[0].id);
       } else if (this.sessions.length === 0) {
         this.sessionInfo.render(null);
-        this.currentSessionId = null;
+        this.activeSessionId = null;
       }
     } catch (e) {
       console.error('[CSM] loadSessions error:', e);
@@ -118,13 +165,13 @@ class App {
   }
 
   private switchSession(id: string): void {
-    if (this.currentSessionId === id) return;
+    if (this.activeSessionId === id) return;
     this.disconnect();
-    this.terminal.clear();
-    this.currentSessionId = id;
+    this.activeSessionId = id;
     this.sessionList.render(this.sessions, id);
     const session = this.sessions.find((s) => s.id === id);
     if (session) this.sessionInfo.render(session);
+    this.showSessionTerminal(id);
     this.connect(id);
   }
 
@@ -198,8 +245,7 @@ class App {
       }
       const session: SessionSummary = await res.json();
       this.sessions.unshift(session);
-      this.sessionList.render(this.sessions, this.currentSessionId);
-      this.terminal.clear();
+      this.sessionList.render(this.sessions, this.activeSessionId);
       this.switchSession(session.id);
     } catch (e) {
       console.error('createNewSession error:', e);
@@ -218,8 +264,8 @@ class App {
       const s = this.sessions.find((x) => x.id === id);
       if (s) {
         s.name = name;
-        this.sessionList.render(this.sessions, this.currentSessionId);
-        if (this.currentSessionId === id) {
+        this.sessionList.render(this.sessions, this.activeSessionId);
+        if (this.activeSessionId === id) {
           this.sessionInfo.render(s);
         }
       }
@@ -232,19 +278,27 @@ class App {
     try {
       const res = await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
       if (!res.ok) return;
+
+      // Clean up terminal
+      const entry = this.terminals.get(id);
+      if (entry) {
+        if (entry.onDataDisposable) entry.onDataDisposable.dispose();
+        entry.container.remove();
+        this.terminals.delete(id);
+      }
+
       this.sessions = this.sessions.filter((s) => s.id !== id);
-      if (this.currentSessionId === id) {
+      if (this.activeSessionId === id) {
         this.disconnect();
-        this.currentSessionId = null;
+        this.activeSessionId = null;
         if (this.sessions.length > 0) {
           this.switchSession(this.sessions[0].id);
         } else {
           this.sessionList.render([], null);
           this.sessionInfo.render(null);
-          this.terminal.clear();
         }
       } else {
-        this.sessionList.render(this.sessions, this.currentSessionId);
+        this.sessionList.render(this.sessions, this.activeSessionId);
       }
     } catch (e) {
       console.error('deleteSession error:', e);
@@ -269,7 +323,11 @@ class App {
       try {
         const msg = JSON.parse(event.data);
         if (msg.type === 'output') {
-          this.terminal.write(msg.data);
+          // Only write if still connected to this session
+          const entry = this.terminals.get(sessionId);
+          if (entry && this.activeSessionId === sessionId) {
+            entry.terminal.write(msg.data);
+          }
         } else if (msg.type === 'status') {
           this.updateSessionStatus(sessionId, msg.status);
         } else if (msg.type === 'pong') {
@@ -288,12 +346,6 @@ class App {
     this.ws.onerror = () => {
       this.ws?.close();
     };
-
-    this.onDataDisposable = this.terminal.onData((data) => {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        this.ws.send(JSON.stringify({ type: 'input', data }));
-      }
-    });
   }
 
   private disconnect(): void {
@@ -301,10 +353,6 @@ class App {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
-    }
-    if (this.onDataDisposable) {
-      this.onDataDisposable.dispose();
-      this.onDataDisposable = null;
     }
     if (this.ws) {
       this.ws.close();
@@ -321,14 +369,15 @@ class App {
   }
 
   private sendResize(): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    const dims = this.fitAddon.proposeDimensions();
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN || !this.activeSessionId) return;
+    const entry = this.terminals.get(this.activeSessionId);
+    if (!entry) return;
+    const dims = entry.fitAddon.proposeDimensions();
     if (dims) {
       this.ws.send(JSON.stringify({ type: 'resize', cols: dims.cols, rows: dims.rows }));
     }
   }
 
-  private heartbeatTimer: number | null = null;
   private startHeartbeat(): void {
     this.heartbeatTimer = window.setInterval(() => {
       if (this.ws?.readyState === WebSocket.OPEN) {
@@ -348,7 +397,7 @@ class App {
     const s = this.sessions.find((x) => x.id === id);
     if (s) {
       s.status = status as any;
-      this.sessionList.render(this.sessions, this.currentSessionId);
+      this.sessionList.render(this.sessions, this.activeSessionId);
     }
   }
 
