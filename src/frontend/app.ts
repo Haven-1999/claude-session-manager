@@ -32,8 +32,26 @@ class App {
       fontSize: 14,
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
       theme: {
-        background: '#1e1e1e',
-        foreground: '#cccccc',
+        background: '#0d1117',
+        foreground: '#e6edf3',
+        cursor: '#58a6ff',
+        selectionBackground: '#264f78',
+        black: '#0d1117',
+        red: '#f85149',
+        green: '#3fb950',
+        yellow: '#d29922',
+        blue: '#58a6ff',
+        magenta: '#bc8cff',
+        cyan: '#39c5cf',
+        white: '#e6edf3',
+        brightBlack: '#484f58',
+        brightRed: '#ff7b72',
+        brightGreen: '#56d364',
+        brightYellow: '#e3b341',
+        brightBlue: '#79c0ff',
+        brightMagenta: '#d2a8ff',
+        brightCyan: '#56d4dd',
+        brightWhite: '#ffffff',
       },
     });
     this.fitAddon = new FitAddon();
@@ -43,19 +61,21 @@ class App {
     this.terminal.open(container);
     this.fitAddon.fit();
 
-    this.sessionList = new SessionList(document.getElementById('session-list')!, {
+    this.sessionList = new SessionList(document.getElementById('session-list-content')!, {
       onSelect: (id) => this.switchSession(id),
-      onNew: () => this.createNewSession(),
+      onNew: () => this.showCreateModal(),
+      onDelete: (id) => this.deleteSession(id),
+      onRename: (id, name) => this.renameSession(id, name),
     });
 
-    this.sessionInfo = new SessionInfo(document.getElementById('session-info')!);
+    this.sessionInfo = new SessionInfo(document.getElementById('session-info-content')!);
 
     window.addEventListener('resize', () => {
       this.fitAddon.fit();
       this.sendResize();
     });
 
-    document.getElementById('btn-new')!.addEventListener('click', () => this.createNewSession());
+    document.getElementById('btn-new')!.addEventListener('click', () => this.showCreateModal());
 
     if (this.isTauri) {
       const actions = document.querySelector('.actions')!;
@@ -76,6 +96,8 @@ class App {
       const res = await fetch('/api/sessions');
       if (!res.ok) {
         console.error('[CSM] fetch /api/sessions failed:', res.status, res.statusText);
+        this.sessionList.render([], null);
+        this.sessionInfo.render(null);
         return;
       }
       this.sessions = await res.json();
@@ -83,9 +105,14 @@ class App {
       this.sessionList.render(this.sessions, this.currentSessionId);
       if (this.sessions.length > 0 && !this.currentSessionId) {
         this.switchSession(this.sessions[0].id);
+      } else if (this.sessions.length === 0) {
+        this.sessionInfo.render(null);
+        this.currentSessionId = null;
       }
     } catch (e) {
       console.error('[CSM] loadSessions error:', e);
+      this.sessionList.render([], null);
+      this.sessionInfo.render(null);
     }
   }
 
@@ -99,13 +126,64 @@ class App {
     this.connect(id);
   }
 
-  private async createNewSession(): Promise<void> {
-    try {
-      const name = prompt('Session name:', `session-${Date.now()}`);
-      if (!name) return;
-      const cwd = prompt('Working directory:', '/tmp');
-      if (!cwd) return;
+  private showCreateModal(): void {
+    const existing = document.querySelector('.modal-overlay');
+    if (existing) existing.remove();
 
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal">
+        <h3>Create New Session</h3>
+        <div class="field">
+          <label>Session Name</label>
+          <input type="text" id="modal-name" value="session-${Date.now()}" placeholder="My Session">
+        </div>
+        <div class="field">
+          <label>Working Directory</label>
+          <input type="text" id="modal-cwd" value="/tmp" placeholder="/tmp">
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" id="modal-cancel">Cancel</button>
+          <button class="btn-primary" id="modal-create">Create</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const nameInput = overlay.querySelector('#modal-name') as HTMLInputElement;
+    const cwdInput = overlay.querySelector('#modal-cwd') as HTMLInputElement;
+    nameInput.focus();
+    nameInput.select();
+
+    const close = () => overlay.remove();
+
+    overlay.querySelector('#modal-cancel')!.addEventListener('click', close);
+    overlay.querySelector('#modal-create')!.addEventListener('click', async () => {
+      const name = nameInput.value.trim();
+      const cwd = cwdInput.value.trim();
+      if (!name || !cwd) return;
+      close();
+      await this.doCreateSession(name, cwd);
+    });
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
+
+    nameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') cwdInput.focus();
+    });
+    cwdInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        (overlay.querySelector('#modal-create') as HTMLButtonElement).click();
+      }
+    });
+  }
+
+  private async doCreateSession(name: string, cwd: string): Promise<void> {
+    try {
       const res = await fetch('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -123,6 +201,50 @@ class App {
     } catch (e) {
       console.error('createNewSession error:', e);
       alert('Error creating session. Check console for details.');
+    }
+  }
+
+  private async renameSession(id: string, name: string): Promise<void> {
+    try {
+      const res = await fetch(`/api/sessions/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) return;
+      const s = this.sessions.find((x) => x.id === id);
+      if (s) {
+        s.name = name;
+        this.sessionList.render(this.sessions, this.currentSessionId);
+        if (this.currentSessionId === id) {
+          this.sessionInfo.render(s);
+        }
+      }
+    } catch (e) {
+      console.error('renameSession error:', e);
+    }
+  }
+
+  private async deleteSession(id: string): Promise<void> {
+    try {
+      const res = await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
+      if (!res.ok) return;
+      this.sessions = this.sessions.filter((s) => s.id !== id);
+      if (this.currentSessionId === id) {
+        this.disconnect();
+        this.currentSessionId = null;
+        if (this.sessions.length > 0) {
+          this.switchSession(this.sessions[0].id);
+        } else {
+          this.sessionList.render([], null);
+          this.sessionInfo.render(null);
+          this.terminal.clear();
+        }
+      } else {
+        this.sessionList.render(this.sessions, this.currentSessionId);
+      }
+    } catch (e) {
+      console.error('deleteSession error:', e);
     }
   }
 
