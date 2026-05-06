@@ -284,24 +284,29 @@ class App {
   }
 
   private async doCreateSession(name: string, cwd: string): Promise<void> {
+    this.logDebug(`Creating session: name=${name}, cwd=${cwd}`);
     try {
       const res = await fetch('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, cwd }),
       });
+      this.logDebug(`Create session response: ${res.status}`);
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+        this.logDebug(`Create session failed: ${err.error || res.statusText}`);
         alert('Failed to create session: ' + (err.error || res.statusText));
         return;
       }
       const session: SessionSummary = await res.json();
+      this.logDebug(`Session created: ${session.id}`);
       this.sessions.unshift(session);
       this.sessionList.render(this.sessions, this.activeSessionId);
       this.switchSession(session.id);
     } catch (e) {
-      console.error('createNewSession error:', e);
-      alert('Error creating session. Check console for details.');
+      const msg = (e as Error).message;
+      this.logDebug('Create session exception: ' + msg);
+      alert('Error creating session: ' + msg);
     }
   }
 
