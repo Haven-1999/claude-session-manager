@@ -190,31 +190,33 @@ class App {
 
   private async loadSessions(): Promise<void> {
     try {
-      console.log('[CSM] Loading sessions...');
+      this.logDebug('Fetching sessions...');
       const res = await fetch('/api/sessions');
       if (!res.ok) {
-        console.error('[CSM] fetch /api/sessions failed:', res.status, res.statusText);
+        this.logDebug('fetch /api/sessions failed: ' + res.status);
         this.sessionList.render([], null);
         this.sessionInfo.render(null);
         return;
       }
       this.sessions = await res.json();
-      console.log('[CSM] Loaded sessions:', this.sessions.length);
+      this.logDebug('Loaded ' + this.sessions.length + ' sessions');
       this.sessionList.render(this.sessions, this.activeSessionId);
       if (this.sessions.length > 0 && !this.activeSessionId) {
+        this.logDebug('Auto-switch to first session');
         this.switchSession(this.sessions[0].id);
       } else if (this.sessions.length === 0) {
         this.sessionInfo.render(null);
         this.activeSessionId = null;
       }
     } catch (e) {
-      console.error('[CSM] loadSessions error:', e);
+      this.logDebug('loadSessions error: ' + (e as Error).message);
       this.sessionList.render([], null);
       this.sessionInfo.render(null);
     }
   }
 
   private switchSession(id: string): void {
+    this.logDebug('switchSession: ' + id + ' (current=' + this.activeSessionId + ')');
     if (this.activeSessionId === id) return;
     this.disconnect();
     this.activeSessionId = id;
@@ -356,10 +358,20 @@ class App {
   }
 
   private connect(sessionId: string): void {
-    if (this.activeSessionId !== sessionId) return;
+    this.logDebug('connect() called for ' + sessionId + ', active=' + this.activeSessionId);
+    if (this.activeSessionId !== sessionId) {
+      this.logDebug('connect() aborted: activeSessionId mismatch');
+      return;
+    }
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws?sessionId=${sessionId}`;
-    this.ws = new WebSocket(wsUrl);
+    this.logDebug('WS URL: ' + wsUrl);
+    try {
+      this.ws = new WebSocket(wsUrl);
+    } catch (e) {
+      this.logDebug('WebSocket constructor error: ' + (e as Error).message);
+      return;
+    }
     const ws = this.ws;
 
     this.showOverlay('Connecting...');

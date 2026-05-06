@@ -20,13 +20,16 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
   wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
     const url = new URL(req.url || '/', `http://${req.headers.host}`);
     const sessionId = url.searchParams.get('sessionId');
+    console.log(`[CSM WS] New connection, sessionId=${sessionId}, url=${req.url}`);
     if (!sessionId) {
+      console.log('[CSM WS] Reject: missing sessionId');
       ws.close(1008, 'Missing sessionId');
       return;
     }
 
     let session = manager.getSession(sessionId);
     if (!session) {
+      console.log(`[CSM WS] Reject: session ${sessionId} not found`);
       ws.close(1008, 'Session not found');
       return;
     }
@@ -117,6 +120,7 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
       resetHeartbeat();
       try {
         const msg: WsMessage = JSON.parse(raw.toString());
+        console.log(`[CSM WS] Message from ${sessionId}: type=${msg.type}`);
         if (msg.type === 'input' && msg.data) {
           if (session!.ptyProcess) {
             session!.ptyProcess.write(msg.data);
