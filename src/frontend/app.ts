@@ -408,15 +408,13 @@ class App {
         this.sendResize();
         this.startHeartbeat();
       }
-      // Retry resize a few times in case backend missed the first one
-      for (let i = 1; i <= 3; i++) {
-        setTimeout(() => {
-          if (this.ws === ws && this.activeSessionId === sessionId) {
-            this.logDebug(`Retry resize #${i}`);
-            this.sendResize();
-          }
-        }, i * 800);
-      }
+      // Single retry in case backend missed the first resize
+      setTimeout(() => {
+        if (this.ws === ws && this.activeSessionId === sessionId) {
+          this.logDebug('Retry resize');
+          this.sendResize();
+        }
+      }, 1200);
     };
 
     ws.onmessage = (event) => {

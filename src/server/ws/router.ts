@@ -36,6 +36,7 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
 
     let pendingInput: string[] = [];
     let pendingResize: { cols: number; rows: number } | null = null;
+    let isSpawning = false;
 
     const ensurePty = (): boolean => {
       if (session!.ptyProcess) {
@@ -46,6 +47,11 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
         console.log(`[CSM WS] ensurePty: session ${session!.id} is stopped, refusing to spawn`);
         return false;
       }
+      if (isSpawning) {
+        console.log(`[CSM WS] ensurePty: spawn already in progress for ${session!.id}`);
+        return true;
+      }
+      isSpawning = true;
 
       const cols = pendingResize?.cols ?? 120;
       const rows = pendingResize?.rows ?? 30;
@@ -60,6 +66,7 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
           rows,
         });
         session!.ptyProcess = pty;
+        isSpawning = false;
         console.log(`[CSM WS] PTY spawned, PID: ${(pty as any).pid}`);
         pty.onData((data) => {
           manager.appendOutput(session!.id, data);
@@ -86,6 +93,7 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
 
         return true;
       } catch (err) {
+        isSpawning = false;
         ws.close(1011, 'Failed to spawn PTY');
         return false;
       }
