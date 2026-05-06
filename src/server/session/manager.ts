@@ -80,6 +80,21 @@ export class SessionManager {
     this.memory.updateSession(id, { status: 'stopped' });
   }
 
+  shutdown(): void {
+    for (const s of this.sessions.values()) {
+      if (s.ptyProcess) {
+        s.ptyProcess.kill('SIGKILL');
+        s.ptyProcess = null;
+      }
+      s.clients.forEach(ws => ws.close());
+      s.clients.clear();
+      if (s.status === 'running') {
+        s.status = 'disconnected';
+        this.memory.updateSession(s.id, { status: 'disconnected' });
+      }
+    }
+  }
+
   appendOutput(id: string, data: string): void {
     this.memory.appendOutput(id, data);
   }

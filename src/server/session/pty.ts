@@ -14,6 +14,7 @@ export function spawnPty(options: PtyOptions): pty.IPty {
   const { cwd, sessionId, claudePath, cols = 120, rows = 30 } = options;
   const shell = process.platform === 'win32' ? 'powershell.exe' : claudePath;
   const args = process.platform === 'win32' ? [] : [];
+  console.log(`[CSM PTY] spawn: ${shell} ${args.join(' ')} in ${cwd} (${cols}x${rows})`);
 
   const proc = pty.spawn(shell, args, {
     name: 'xterm-256color',

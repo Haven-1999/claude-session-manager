@@ -42,6 +42,7 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
       const rows = pendingResize?.rows ?? 30;
 
       try {
+        console.log(`[CSM WS] Spawning PTY for session ${session!.id} in ${session!.cwd} (${cols}x${rows})`);
         const pty = spawnPty({
           cwd: session!.cwd,
           sessionId: session!.id,
@@ -50,11 +51,13 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
           rows,
         });
         session!.ptyProcess = pty;
+        console.log(`[CSM WS] PTY spawned, PID: ${(pty as any).pid}`);
         pty.onData((data) => {
           manager.appendOutput(session!.id, data);
           broadcastToSession(session!, data);
         });
         pty.onExit(({ exitCode }) => {
+          console.log(`[CSM WS] PTY exited for session ${session!.id}, code: ${exitCode}`);
           session!.ptyProcess = null;
           manager.updateStatus(session!.id, 'stopped');
           broadcastStatus(session!);

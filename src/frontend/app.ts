@@ -362,6 +362,7 @@ class App {
 
     ws.onopen = () => {
       if (this.ws !== ws || this.activeSessionId !== sessionId) return;
+      console.log('[CSM] WebSocket open for session', sessionId);
       this.hideOverlay();
       this.reconnectDelay = 1000;
       // Force status to running since we are connected
@@ -386,6 +387,7 @@ class App {
       try {
         const msg = JSON.parse(event.data);
         if (msg.type === 'output') {
+          console.log('[CSM] output received, length:', msg.data?.length || 0);
           const entry = this.terminals.get(sessionId);
           if (entry) {
             entry.terminal.write(msg.data);
@@ -397,6 +399,7 @@ class App {
           }
           this.scheduleNotification();
         } else if (msg.type === 'status') {
+          console.log('[CSM] status received:', msg.status);
           this.updateSessionStatus(sessionId, msg.status);
         } else if (msg.type === 'pong') {
           // heartbeat ok
@@ -454,9 +457,10 @@ class App {
     const entry = this.terminals.get(this.activeSessionId);
     if (!entry) return;
     const dims = entry.fitAddon.proposeDimensions();
-    if (dims) {
-      this.ws.send(JSON.stringify({ type: 'resize', cols: dims.cols, rows: dims.rows }));
-    }
+    const cols = dims?.cols ?? 120;
+    const rows = dims?.rows ?? 30;
+    console.log('[CSM] sendResize:', { cols, rows, hasDims: !!dims });
+    this.ws.send(JSON.stringify({ type: 'resize', cols, rows }));
   }
 
   private startHeartbeat(): void {

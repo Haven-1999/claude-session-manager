@@ -35,19 +35,43 @@ pub fn kill_tunnel(state: &TunnelState) {
     }
 }
 
+fn kill_process_on_port(port: u16) {
+    let output = std::process::Command::new("lsof")
+        .args(["-ti", &format!(":{}", port)])
+        .output();
+    if let Ok(out) = output {
+        let pids = String::from_utf8_lossy(&out.stdout);
+        for pid in pids.lines().filter(|s| !s.is_empty()) {
+            let _ = std::process::Command::new("kill")
+                .args(["-9", pid])
+                .status();
+        }
+    }
+}
+
 #[command]
 pub fn start_tunnel(
     config: AppConfig,
     state: State<TunnelState>,
     app: AppHandle,
 ) -> Result<(), String> {
-    // Stop any existing tunnel first
+    // 1. If the port is already reachable, reuse the existing tunnel
+    if check_connection(config.local_port) {
+        println!("[TAURI] Port {} is already reachable, reusing existing tunnel.", config.local_port);
+        return Ok(());
+    }
+
+    // 2. Stop any tunnel tracked by our own state
     {
         let mut guard = state.child.lock().map_err(|e| e.to_string())?;
         if let Some(mut child) = guard.take() {
             kill_child_group(&mut child);
         }
     }
+
+    // 3. Aggressively clear any stale process holding the local port
+    kill_process_on_port(config.local_port);
+    std::thread::sleep(Duration::from_millis(300));
 
     let log_path = ssh_log_path(&app);
     if let Some(parent) = log_path.parent() {
@@ -103,9 +127,19 @@ pub fn start_tunnel(
         match c.try_wait() {
             Ok(Some(status)) => {
                 let log_content = std::fs::read_to_string(&log_path).unwrap_or_default();
+                // Provide actionable guidance for common errors
+                let hint = if log_content.contains("Address already in use") {
+                    "Local port is still occupied after cleanup. Try changing the Local Port in Settings (e.g., 18081)."
+                } else if log_content.contains("Connection refused") {
+                    "Remote SSH server refused the connection. Check SSH Host and Port."
+                } else if log_content.contains("Permission denied") || log_content.contains("authentication") {
+                    "SSH authentication failed. Check your SSH key (Identity File) or user name."
+                } else {
+                    ""
+                };
                 return Err(format!(
-                    "SSH tunnel exited immediately (status: {}). Log:\n{}",
-                    status, log_content
+                    "SSH tunnel exited immediately (status: {}).\nLog:\n{}\n{}",
+                    status, log_content, hint
                 ));
             }
             Ok(None) => {}

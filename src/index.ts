@@ -47,7 +47,7 @@ function main(): void {
     console.log(`\n${signal} received, shutting down...`);
     wss.close(() => {
       server.close(() => {
-        manager.listSessions().forEach((s) => manager.closeSession(s.id, true));
+        manager.shutdown();
         memory.close();
         process.exit(0);
       });
