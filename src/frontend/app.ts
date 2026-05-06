@@ -391,10 +391,13 @@ class App {
       this.hideOverlay();
       this.reconnectDelay = 1000;
       this.updateSessionStatus(sessionId, 'running');
-      // Clear terminal before receiving history to avoid content duplication
       const entry = this.terminals.get(sessionId);
       if (entry) {
-        entry.terminal.clear();
+        // Only clear on reconnect when terminal already has content
+        const buf = (entry.terminal as any).buffer;
+        if (buf && buf.active && buf.active.length > 0) {
+          entry.terminal.clear();
+        }
         requestAnimationFrame(() => {
           if (this.ws !== ws || this.activeSessionId !== sessionId) return;
           entry.fitAddon.fit();
