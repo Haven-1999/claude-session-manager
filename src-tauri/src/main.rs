@@ -92,11 +92,12 @@ fn main() {
                 if let Some(cfg) = config::get_config(app_handle.clone()) {
                     println!("[TAURI] Config found, auto-starting tunnel to {}:{} -> localhost:{}",
                         cfg.ssh_host, cfg.remote_csm_port, cfg.local_port);
-                    let state = app_handle.state::<tunnel::TunnelState>();
                     let app_clone = app_handle.clone();
+                    let cfg_clone = cfg.clone();
                     let local_port = cfg.local_port;
                     std::thread::spawn(move || {
-                        match tunnel::start_tunnel_inner(&cfg, &state, &app_clone) {
+                        let state = app_clone.state::<tunnel::TunnelState>();
+                        match tunnel::start_tunnel_inner(&cfg_clone, &*state, &app_clone) {
                             Ok(_) => {
                                 println!("[TAURI] Tunnel started, waiting for port {} to be ready...", local_port);
                                 for i in 0..30 {
