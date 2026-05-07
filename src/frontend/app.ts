@@ -273,6 +273,10 @@ class App {
       if (isTimeout) {
         this.showOverlay('Connection timed out. SSH tunnel may be unstable. Click Settings to reconnect.');
       }
+      // Diagnostic: try fetching root to see if tunnel is completely dead
+      fetch('/', { method: 'HEAD', signal: AbortSignal.timeout(3000) })
+        .then(r => this.logDebug('Diagnostic root fetch: HTTP ' + r.status))
+        .catch(e2 => this.logDebug('Diagnostic root fetch failed: ' + (e2 as Error).name));
     }
   }
 
@@ -433,6 +437,14 @@ class App {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws?sessionId=${sessionId}`;
     this.logDebug('WS URL: ' + wsUrl);
+
+    // Preflight: verify HTTP layer is reachable before opening WS
+    fetch('/api/sessions', { method: 'HEAD', signal: AbortSignal.timeout(5000) }).then((r) => {
+      this.logDebug('WS preflight HTTP ' + r.status);
+    }).catch((e) => {
+      this.logDebug('WS preflight failed: ' + (e as Error).name + ' — tunnel may be broken');
+    });
+
     try {
       this.ws = new WebSocket(wsUrl);
     } catch (e) {
@@ -508,7 +520,8 @@ class App {
     };
 
     ws.onerror = (e) => {
-      this.logDebug('WS error: ' + JSON.stringify(e));
+      const state = ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][ws.readyState] || 'UNKNOWN';
+      this.logDebug('WS error (readyState=' + state + '): ' + JSON.stringify(e));
       ws.close();
     };
   }
