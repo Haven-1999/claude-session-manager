@@ -120,9 +120,13 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
     ws.send(JSON.stringify({ type: 'status', status: session.status }));
 
     // Send output history so reconnecting clients see prior context
-    const history = manager.getOutputHistory(sessionId);
-    if (history.length > 0) {
-      ws.send(JSON.stringify({ type: 'output', data: history.join('') }));
+    // Skip history on resume (reconnect) to avoid duplicate welcome messages
+    const isResume = url.searchParams.get('resume') === '1';
+    if (!isResume) {
+      const history = manager.getOutputHistory(sessionId);
+      if (history.length > 0) {
+        ws.send(JSON.stringify({ type: 'output', data: history.join('') }));
+      }
     }
 
     // Eagerly spawn PTY if not already running so the user sees output immediately
