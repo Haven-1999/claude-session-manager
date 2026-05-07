@@ -85,6 +85,7 @@ async function doConnect(config) {
       try {
         await invoke('open_csm_window', { url: csmUrl });
         console.log('[SETUP] open_csm_window OK');
+        await new Promise((r) => setTimeout(r, 500));
         const current = getCurrentWebviewWindow();
         await current.close();
       } catch (e) {

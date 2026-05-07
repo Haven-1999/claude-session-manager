@@ -38,8 +38,11 @@ fn open_csm_window(app: tauri::AppHandle, url: String) -> Result<(), String> {
         .title("Claude Session Manager")
         .inner_size(1200.0, 800.0)
         .devtools(true)
+        .visible(true)
         .build()
         .map_err(|e| e.to_string())?;
+    let _ = win.show();
+    let _ = win.set_focus();
     println!("[TAURI] Created csm window with label: {:?}", win.label());
     Ok(())
 }
