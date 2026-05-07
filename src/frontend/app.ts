@@ -8,7 +8,7 @@ import { FileLinkProvider } from './components/file-link-provider.js';
 function showAlert(message: string): void {
   const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
   if (!isTauri) {
-    showAlert(message);
+    window.alert(message);
     return;
   }
   // Tauri WebView blocks window.alert — use custom DOM modal
@@ -108,6 +108,7 @@ class App {
     });
     window.addEventListener('blur', () => { this.windowFocused = false; });
     window.addEventListener('focus', () => { this.windowFocused = true; });
+    document.addEventListener('paste', (e) => this.handlePaste(e));
 
     document.getElementById('btn-new')!.addEventListener('click', () => this.showCreateModal());
 
@@ -716,6 +717,48 @@ class App {
     });
   }
 
+  private async handlePaste(e: ClipboardEvent): Promise<void> {
+    if (!e.clipboardData) return;
+    const files = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith('image/'));
+    if (files.length === 0) return;
+
+    // Skip if focus is inside CodeMirror editor
+    const target = e.target as HTMLElement;
+    if (target?.closest('.cm-editor')) return;
+
+    e.preventDefault();
+
+    for (const file of files) {
+      this.logDebug(`Pasting image: ${file.name} (${file.size} bytes)`);
+      try {
+        const base64 = await readFileAsBase64(file);
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: this.activeSessionId,
+            filename: file.name,
+            data: base64,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+          showAlert('Failed to upload image: ' + (err.error || res.statusText));
+          continue;
+        }
+        const result = await res.json();
+        this.logDebug(`Image uploaded to: ${result.path}`);
+
+        if (this.ws?.readyState === WebSocket.OPEN && this.activeSessionId) {
+          const inputData = result.path + ' ';
+          this.ws.send(JSON.stringify({ type: 'input', data: inputData }));
+        }
+      } catch (err) {
+        showAlert('Error uploading image: ' + (err as Error).message);
+      }
+    }
+  }
+
   private logDebug(msg: string): void {
     const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
     this.debugLines.push(line);
@@ -739,6 +782,19 @@ class App {
       console.error('openSettings error:', e);
     }
   }
+}
+
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64 = result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 new App();

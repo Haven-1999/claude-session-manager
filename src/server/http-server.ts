@@ -1,6 +1,7 @@
 import express from 'express';
 import * as http from 'http';
 import * as path from 'path';
+import * as fs from 'fs';
 import { WebSocketServer } from 'ws';
 import type { SessionManager } from './session/manager';
 import { setupWebSocketRouter } from './ws/router';
@@ -14,7 +15,7 @@ export interface ServerOptions {
   auth?: string;
 }
 
-export function createHttpServer(manager: SessionManager, options: Pick<ServerOptions, 'claudePath' | 'auth'>): { server: http.Server; wss: WebSocketServer } {
+export function createHttpServer(manager: SessionManager, options: Pick<ServerOptions, 'claudePath' | 'auth' | 'dataDir'>): { server: http.Server; wss: WebSocketServer } {
   const app = express();
   app.use(express.json());
 
@@ -86,6 +87,39 @@ export function createHttpServer(manager: SessionManager, options: Pick<ServerOp
   app.get('/api/cwd-suggestions', (_req, res) => {
     // TODO: implement via MemoryService if needed; stub for now
     res.json([]);
+  });
+
+  app.post('/api/upload', (req, res) => {
+    const { sessionId, filename, data } = req.body;
+    if (!sessionId || typeof sessionId !== 'string') {
+      return res.status(400).json({ error: 'sessionId is required' });
+    }
+    if (!filename || typeof filename !== 'string') {
+      return res.status(400).json({ error: 'filename is required' });
+    }
+    if (!data || typeof data !== 'string') {
+      return res.status(400).json({ error: 'data is required' });
+    }
+
+    const uploadDir = path.join(options.dataDir, 'uploads', sessionId);
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = path.join(uploadDir, `${Date.now()}_${safeName}`);
+
+    try {
+      const buffer = Buffer.from(data, 'base64');
+      const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+      if (buffer.length > MAX_IMAGE_SIZE) {
+        return res.status(413).json({ error: 'File too large (max 10MB)' });
+      }
+      fs.writeFileSync(filePath, buffer);
+      res.json({ path: filePath });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   const fileService = new FileService();

@@ -14,7 +14,7 @@ export interface PtyOptions {
 export function spawnPty(options: PtyOptions): pty.IPty {
   const { cwd, sessionId, claudePath, cols = 120, rows = 30, resume = false } = options;
   const shell = process.platform === 'win32' ? 'powershell.exe' : claudePath;
-  const args = resume ? ['resume'] : [];
+  const args = resume ? ['--resume', sessionId] : [];
   console.log(`[CSM PTY] spawn: ${shell} ${args.join(' ')} in ${cwd} (${cols}x${rows}) resume=${resume}`);
 
   const proc = pty.spawn(shell, args, {

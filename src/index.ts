@@ -37,7 +37,7 @@ function main(): void {
   const manager = new SessionManager(memory);
   manager.restoreSessions();
 
-  const { server, wss } = createHttpServer(manager, { claudePath: opts.claudePath, auth: opts.auth });
+  const { server, wss } = createHttpServer(manager, { claudePath: opts.claudePath, auth: opts.auth, dataDir: opts.dataDir });
 
   server.listen(opts.port, opts.host, () => {
     console.log(`CSM listening on http://${opts.host}:${opts.port}`);
