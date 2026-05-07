@@ -237,7 +237,7 @@ class App {
     try {
       this.logDebug('Fetching sessions...');
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5000);
+      const timeout = setTimeout(() => controller.abort(), 10000);
       const res = await fetch('/api/sessions', { signal: controller.signal });
       clearTimeout(timeout);
       const elapsed = Math.round(performance.now() - start);
@@ -260,7 +260,9 @@ class App {
     } catch (e) {
       const elapsed = Math.round(performance.now() - start);
       const err = e as Error;
-      this.logDebug('loadSessions error after ' + elapsed + 'ms: ' + err.name + ': ' + err.message);
+      const isTimeout = err.name === 'AbortError';
+      const hint = isTimeout ? ' (timeout — tunnel may be slow)' : '';
+      this.logDebug('loadSessions error after ' + elapsed + 'ms: ' + err.name + ': ' + err.message + hint);
       if (retries > 0) {
         this.logDebug('Retrying loadSessions in 1s... (' + retries + ' left)');
         setTimeout(() => this.loadSessions(retries - 1), 1000);
@@ -268,6 +270,9 @@ class App {
       }
       this.sessionList.render([], null);
       this.sessionInfo.render(null);
+      if (isTimeout) {
+        this.showOverlay('Connection timed out. SSH tunnel may be unstable. Click Settings to reconnect.');
+      }
     }
   }
 
