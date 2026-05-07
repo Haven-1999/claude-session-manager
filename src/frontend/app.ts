@@ -108,7 +108,7 @@ class App {
     });
     window.addEventListener('blur', () => { this.windowFocused = false; });
     window.addEventListener('focus', () => { this.windowFocused = true; });
-    document.addEventListener('paste', (e) => this.handlePaste(e));
+    document.addEventListener('paste', (e) => this.handlePaste(e), true);
 
     document.getElementById('btn-new')!.addEventListener('click', () => this.showCreateModal());
     document.getElementById('btn-debug')!.addEventListener('click', () => this.toggleDebugPanel());
@@ -809,9 +809,32 @@ class App {
   }
 
   private async handlePaste(e: ClipboardEvent): Promise<void> {
-    if (!e.clipboardData) return;
-    const files = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith('image/'));
-    if (files.length === 0) return;
+    if (!e.clipboardData) {
+      this.logDebug('Paste: no clipboardData');
+      return;
+    }
+
+    // Use items API for better compatibility across browsers
+    const items = e.clipboardData.items;
+    if (!items || items.length === 0) {
+      this.logDebug('Paste: no clipboard items');
+      return;
+    }
+
+    const files: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      this.logDebug(`Paste item[${i}]: kind=${item.kind}, type=${item.type}`);
+      if (item.kind === 'file' && item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) files.push(file);
+      }
+    }
+
+    if (files.length === 0) {
+      this.logDebug('Paste: no image files found');
+      return;
+    }
 
     // Skip if focus is inside CodeMirror editor
     const target = e.target as HTMLElement;
