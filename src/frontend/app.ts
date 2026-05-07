@@ -122,10 +122,12 @@ class App {
       actions.appendChild(settingsBtn);
     }
 
-    this.loadSessions();
-
     if (this.isTauri) {
-      this.setupTauriTunnelListeners();
+      this.setupTauriTunnelListeners().then(() => {
+        this.loadSessions();
+      });
+    } else {
+      this.loadSessions();
     }
 
     if ('Notification' in window && Notification.permission === 'default') {
@@ -229,7 +231,7 @@ class App {
     }
   }
 
-  private async loadSessions(): Promise<void> {
+  private async loadSessions(retries = 2): Promise<void> {
     this.logDebug('loadSessions: location=' + window.location.href);
     const start = performance.now();
     try {
@@ -259,6 +261,11 @@ class App {
       const elapsed = Math.round(performance.now() - start);
       const err = e as Error;
       this.logDebug('loadSessions error after ' + elapsed + 'ms: ' + err.name + ': ' + err.message);
+      if (retries > 0) {
+        this.logDebug('Retrying loadSessions in 1s... (' + retries + ' left)');
+        setTimeout(() => this.loadSessions(retries - 1), 1000);
+        return;
+      }
       this.sessionList.render([], null);
       this.sessionInfo.render(null);
     }
