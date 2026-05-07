@@ -54,6 +54,26 @@ fn close_window(window: tauri::WebviewWindow) -> Result<(), String> {
 }
 
 #[command]
+fn test_http(url: String) -> Result<String, String> {
+    println!("[TAURI] test_http called with url: {}", url);
+    match std::process::Command::new("curl")
+        .args(["-s", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "5", &url])
+        .output()
+    {
+        Ok(output) => {
+            let code = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            println!("[TAURI] test_http curl result: code={}, stderr={}", code, stderr);
+            Ok(format!("HTTP {}", code))
+        }
+        Err(e) => {
+            println!("[TAURI] test_http curl failed: {}", e);
+            Err(format!("curl failed: {}", e))
+        }
+    }
+}
+
+#[command]
 fn request_attention() {
     // Dock bounce (best-effort)
     // macOS native notification via osascript — works even when Tauri is backgrounded
@@ -81,6 +101,7 @@ fn main() {
             open_csm_window,
             close_window,
             request_attention,
+            test_http,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {

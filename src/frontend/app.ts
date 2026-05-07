@@ -275,9 +275,31 @@ class App {
         this.showOverlay('Connection timed out. SSH tunnel may be unstable. Click Settings to reconnect.');
       }
       // Diagnostic: try fetching root to see if tunnel is completely dead
-      fetch('/', { method: 'HEAD', signal: AbortSignal.timeout(3000) })
-        .then(r => this.logDebug('Diagnostic root fetch: HTTP ' + r.status))
-        .catch(e2 => this.logDebug('Diagnostic root fetch failed: ' + (e2 as Error).name));
+      const diagController = new AbortController();
+      const diagTimeout = setTimeout(() => diagController.abort(), 3000);
+      fetch('/', { method: 'HEAD', signal: diagController.signal })
+        .then(r => {
+          clearTimeout(diagTimeout);
+          this.logDebug('Diagnostic root fetch: HTTP ' + r.status);
+        })
+        .catch(e2 => {
+          clearTimeout(diagTimeout);
+          this.logDebug('Diagnostic root fetch failed: ' + (e2 as Error).name + ': ' + (e2 as Error).message);
+        });
+      // Diagnostic: test via Rust backend curl
+      if (this.isTauri) {
+        try {
+          const tauri = (window as any).__TAURI__;
+          const invoke = tauri?.core?.invoke || tauri?.invoke;
+          if (invoke) {
+            invoke('test_http', { url: window.location.origin + '/api/sessions' })
+              .then((res: string) => this.logDebug('Rust test_http: ' + res))
+              .catch((err: Error) => this.logDebug('Rust test_http error: ' + err.message));
+          }
+        } catch (e3) {
+          this.logDebug('Rust test_http invoke failed: ' + (e3 as Error).message);
+        }
+      }
     }
   }
 
@@ -529,6 +551,20 @@ class App {
     ws.onerror = (e) => {
       const state = ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][ws.readyState] || 'UNKNOWN';
       this.logDebug('WS error (readyState=' + state + '): ' + JSON.stringify(e));
+      // Diagnostic: test if the server is reachable at all via Rust curl
+      if (this.isTauri && ws.readyState === WebSocket.CLOSED) {
+        try {
+          const tauri = (window as any).__TAURI__;
+          const invoke = tauri?.core?.invoke || tauri?.invoke;
+          if (invoke) {
+            invoke('test_http', { url: wsUrl.replace('ws:', 'http:') })
+              .then((res: string) => this.logDebug('Rust WS diag: ' + res))
+              .catch((err: Error) => this.logDebug('Rust WS diag error: ' + err.message));
+          }
+        } catch (e3) {
+          this.logDebug('Rust WS diag invoke failed: ' + (e3 as Error).message);
+        }
+      }
       ws.close();
     };
   }
