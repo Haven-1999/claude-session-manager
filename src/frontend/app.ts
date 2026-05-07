@@ -140,6 +140,9 @@ class App {
       cursorBlink: true,
       fontSize: 14,
       fontFamily: 'Menlo, Monaco, "Courier New", "PingFang SC", monospace',
+      allowProposedApi: true,
+      convertEol: true,
+      screenReaderMode: false,
       theme: {
         background: '#0d1117',
         foreground: '#e6edf3',
