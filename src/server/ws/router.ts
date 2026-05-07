@@ -2,7 +2,7 @@ import type { IncomingMessage } from 'http';
 import type { WebSocket, WebSocketServer } from 'ws';
 import type { SessionManager } from '../session/manager';
 import type { Session } from '../session/types';
-import { spawnPty, broadcastToSession, broadcastStatus } from '../session/pty';
+import { spawnPty, broadcastToSession, broadcastStatus, waitForClaudeSessionId } from '../session/pty';
 
 interface WsMessage {
   type: 'input' | 'resize' | 'ping';
@@ -48,16 +48,8 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
         return true;
       }
 
-      const history = manager.getOutputHistory(session!.id);
-      const shouldResume = history.length > 0;
-
       if (session!.status === 'stopped') {
-        if (!shouldResume) {
-          console.log(`[CSM WS] ensurePty: session ${session!.id} is stopped and has no history, refusing to spawn`);
-          return false;
-        }
-        // Has history — allow resume by resetting status
-        console.log(`[CSM WS] ensurePty: session ${session!.id} was stopped but has history, allowing resume`);
+        console.log(`[CSM WS] ensurePty: session ${session!.id} is stopped, allowing resume`);
         session!.status = 'disconnected';
         manager.updateStatus(session!.id, 'disconnected');
       }
@@ -66,20 +58,32 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
 
       const cols = pendingResize?.cols ?? 120;
       const rows = pendingResize?.rows ?? 30;
+      const resumeClaudeId = session!.claudeSessionId;
 
       try {
-        console.log(`[CSM WS] Spawning PTY for session ${session!.id} in ${session!.cwd} (${cols}x${rows}) resume=${shouldResume}`);
+        console.log(`[CSM WS] Spawning PTY for session ${session!.id} in ${session!.cwd} (${cols}x${rows}) resume=${!!resumeClaudeId}`);
         const pty = spawnPty({
           cwd: session!.cwd,
           sessionId: session!.id,
           claudePath,
           cols,
           rows,
-          resume: shouldResume,
+          resumeClaudeId,
         });
         session!.ptyProcess = pty;
+        const pid = (pty as any).pid as number;
+        console.log(`[CSM WS] PTY spawned, PID: ${pid}`);
+
+        // Capture Claude's session ID asynchronously
+        if (!session!.claudeSessionId) {
+          waitForClaudeSessionId(pid, 10000).then((claudeId) => {
+            if (claudeId) {
+              manager.saveClaudeSessionId(session!.id, claudeId);
+            }
+          });
+        }
+
         isSpawning = false;
-        console.log(`[CSM WS] PTY spawned, PID: ${(pty as any).pid}`);
         pty.onData((data) => {
           manager.appendOutput(session!.id, data);
           broadcastToSession(session!, data);

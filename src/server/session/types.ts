@@ -12,6 +12,7 @@ export interface Session {
   clients: Set<WebSocket>;
   createdAt: number;
   lastActiveAt: number;
+  claudeSessionId?: string | null;
 }
 
 export interface SessionRecord {
@@ -21,4 +22,5 @@ export interface SessionRecord {
   status: SessionStatus;
   created_at: number;
   last_active_at: number;
+  claude_session_id?: string | null;
 }

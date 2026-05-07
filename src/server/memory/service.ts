@@ -26,9 +26,14 @@ export class MemoryService {
       );
       CREATE INDEX IF NOT EXISTS idx_output_session ON output_log(session_id);
     `);
+    // Migration: add claude_session_id column if missing
+    const hasColumn = this.db.prepare(`SELECT COUNT(*) as count FROM pragma_table_info('sessions') WHERE name = 'claude_session_id'`).get() as { count: number };
+    if (hasColumn.count === 0) {
+      this.db.exec(`ALTER TABLE sessions ADD COLUMN claude_session_id TEXT`);
+    }
   }
 
-  createSession(partial: { name: string; cwd: string; status: SessionStatus }): SessionRecord {
+  createSession(partial: { name: string; cwd: string; status: SessionStatus; claude_session_id?: string | null }): SessionRecord {
     const id = crypto.randomUUID();
     const now = Date.now();
     const record: SessionRecord = {
@@ -38,10 +43,11 @@ export class MemoryService {
       status: partial.status,
       created_at: now,
       last_active_at: now,
+      claude_session_id: partial.claude_session_id ?? null,
     };
     this.db.prepare(
-      `INSERT INTO sessions (id, name, cwd, status, created_at, last_active_at) VALUES (?, ?, ?, ?, ?, ?)`
-    ).run(record.id, record.name, record.cwd, record.status, record.created_at, record.last_active_at);
+      `INSERT INTO sessions (id, name, cwd, status, created_at, last_active_at, claude_session_id) VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(record.id, record.name, record.cwd, record.status, record.created_at, record.last_active_at, record.claude_session_id);
     return record;
   }
 
@@ -54,12 +60,13 @@ export class MemoryService {
     return this.db.prepare(`SELECT * FROM sessions ORDER BY last_active_at DESC`).all() as SessionRecord[];
   }
 
-  updateSession(id: string, changes: Partial<Pick<SessionRecord, 'name' | 'status' | 'last_active_at'>>): void {
+  updateSession(id: string, changes: Partial<Pick<SessionRecord, 'name' | 'status' | 'last_active_at' | 'claude_session_id'>>): void {
     const sets: string[] = [];
     const values: unknown[] = [];
     if (changes.name !== undefined) { sets.push('name = ?'); values.push(changes.name); }
     if (changes.status !== undefined) { sets.push('status = ?'); values.push(changes.status); }
     if (changes.last_active_at !== undefined) { sets.push('last_active_at = ?'); values.push(changes.last_active_at); }
+    if (changes.claude_session_id !== undefined) { sets.push('claude_session_id = ?'); values.push(changes.claude_session_id); }
     if (sets.length === 0) return;
     values.push(id);
     this.db.prepare(`UPDATE sessions SET ${sets.join(', ')} WHERE id = ?`).run(...values);

@@ -19,6 +19,7 @@ export class SessionManager {
       lastActiveAt: record.last_active_at,
       ptyProcess: null,
       clients: new Set(),
+      claudeSessionId: record.claude_session_id,
     };
     this.sessions.set(session.id, session);
     return session;
@@ -44,6 +45,14 @@ export class SessionManager {
     if (!s) return;
     s.status = status;
     this.memory.updateSession(id, { status });
+  }
+
+  saveClaudeSessionId(id: string, claudeSessionId: string): void {
+    const s = this.sessions.get(id);
+    if (!s) return;
+    s.claudeSessionId = claudeSessionId;
+    this.memory.updateSession(id, { claude_session_id: claudeSessionId });
+    console.log(`[CSM Manager] Saved claudeSessionId=${claudeSessionId} for session ${id}`);
   }
 
   attachClient(id: string, ws: WebSocket): void {
@@ -115,6 +124,7 @@ export class SessionManager {
         lastActiveAt: r.last_active_at,
         ptyProcess: null,
         clients: new Set(),
+        claudeSessionId: r.claude_session_id,
       });
     }
   }

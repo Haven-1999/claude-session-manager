@@ -46,6 +46,7 @@ export function createHttpServer(manager: SessionManager, options: Pick<ServerOp
       status: s.status,
       createdAt: s.createdAt,
       lastActiveAt: s.lastActiveAt,
+      claudeSessionId: s.claudeSessionId,
     })));
   });
 
