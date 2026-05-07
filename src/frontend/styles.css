@@ -573,8 +573,14 @@ html, body, #app {
   max-width: 320px;
   z-index: 50;
   line-height: 1.5;
-  pointer-events: none;
   white-space: pre-wrap;
+  user-select: text;
+  display: none;
+  cursor: text;
+}
+
+.debug-panel.visible {
+  display: block;
 }
 
 /* Terminal link hover styling */

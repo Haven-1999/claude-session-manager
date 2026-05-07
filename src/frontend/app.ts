@@ -111,6 +111,7 @@ class App {
     document.addEventListener('paste', (e) => this.handlePaste(e));
 
     document.getElementById('btn-new')!.addEventListener('click', () => this.showCreateModal());
+    document.getElementById('btn-debug')!.addEventListener('click', () => this.toggleDebugPanel());
 
     if (this.isTauri) {
       const actions = document.querySelector('.actions')!;
@@ -439,10 +440,16 @@ class App {
     this.logDebug('WS URL: ' + wsUrl);
 
     // Preflight: verify HTTP layer is reachable before opening WS
-    fetch('/api/sessions', { method: 'HEAD', signal: AbortSignal.timeout(5000) }).then((r) => {
+    // Use AbortController instead of AbortSignal.timeout for older WebKit compatibility
+    const preflightController = new AbortController();
+    const preflightTimeout = setTimeout(() => preflightController.abort(), 5000);
+    fetch('/api/sessions', { method: 'HEAD', signal: preflightController.signal }).then((r) => {
+      clearTimeout(preflightTimeout);
       this.logDebug('WS preflight HTTP ' + r.status);
     }).catch((e) => {
-      this.logDebug('WS preflight failed: ' + (e as Error).name + ' — tunnel may be broken');
+      clearTimeout(preflightTimeout);
+      const err = e as Error;
+      this.logDebug('WS preflight failed: ' + err.name + ' — ' + err.message);
     });
 
     try {
@@ -466,7 +473,7 @@ class App {
         // Only clear on reconnect when terminal already has content
         const buf = (entry.terminal as any).buffer;
         if (buf && buf.active && buf.active.length > 0) {
-          entry.terminal.clear();
+          entry.terminal.write('\x1bc');
         }
         requestAnimationFrame(() => {
           if (this.ws !== ws || this.activeSessionId !== sessionId) return;
@@ -803,6 +810,10 @@ class App {
         showAlert('Error uploading image: ' + (err as Error).message);
       }
     }
+  }
+
+  private toggleDebugPanel(): void {
+    this.debugEl.classList.toggle('visible');
   }
 
   private logDebug(msg: string): void {
