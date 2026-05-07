@@ -43,20 +43,29 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
         console.log(`[CSM WS] ensurePty: already running for ${session!.id}`);
         return true;
       }
-      if (session!.status === 'stopped') {
-        console.log(`[CSM WS] ensurePty: session ${session!.id} is stopped, refusing to spawn`);
-        return false;
-      }
       if (isSpawning) {
         console.log(`[CSM WS] ensurePty: spawn already in progress for ${session!.id}`);
         return true;
       }
+
+      const history = manager.getOutputHistory(session!.id);
+      const shouldResume = history.length > 0;
+
+      if (session!.status === 'stopped') {
+        if (!shouldResume) {
+          console.log(`[CSM WS] ensurePty: session ${session!.id} is stopped and has no history, refusing to spawn`);
+          return false;
+        }
+        // Has history — allow resume by resetting status
+        console.log(`[CSM WS] ensurePty: session ${session!.id} was stopped but has history, allowing resume`);
+        session!.status = 'disconnected';
+        manager.updateStatus(session!.id, 'disconnected');
+      }
+
       isSpawning = true;
 
       const cols = pendingResize?.cols ?? 120;
       const rows = pendingResize?.rows ?? 30;
-      const history = manager.getOutputHistory(session!.id);
-      const shouldResume = history.length > 0;
 
       try {
         console.log(`[CSM WS] Spawning PTY for session ${session!.id} in ${session!.cwd} (${cols}x${rows}) resume=${shouldResume}`);
