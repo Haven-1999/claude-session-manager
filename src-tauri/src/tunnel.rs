@@ -90,9 +90,17 @@ pub fn start_tunnel_inner(
         .arg("-o")
         .arg("ServerAliveInterval=30")
         .arg("-o")
+        .arg("ServerAliveCountMax=3")
+        .arg("-o")
+        .arg("TCPKeepAlive=yes")
+        .arg("-o")
         .arg("ExitOnForwardFailure=yes")
         .arg("-o")
         .arg("BatchMode=yes")
+        .arg("-o")
+        .arg("StrictHostKeyChecking=accept-new")
+        .arg("-o")
+        .arg("ConnectTimeout=15")
         .arg("-L")
         .arg(format!(
             "{}:localhost:{}",
@@ -244,6 +252,7 @@ pub fn monitor_tunnel(
     app: AppHandle,
 ) {
     let mut consecutive_failures = 0u32;
+    let mut rebuild_delay = 2u64;
     loop {
         std::thread::sleep(Duration::from_secs(10));
 
@@ -253,6 +262,7 @@ pub fn monitor_tunnel(
                 let _ = app.emit("tunnel-reconnected", ());
             }
             consecutive_failures = 0;
+            rebuild_delay = 2;
             continue;
         }
 
@@ -260,9 +270,23 @@ pub fn monitor_tunnel(
         println!("[TAURI] Tunnel health check failed ({}/2)", consecutive_failures);
 
         if consecutive_failures >= 2 {
-            println!("[TAURI] Tunnel deemed dead, emitting disconnect event");
+            println!("[TAURI] Tunnel deemed dead, auto-rebuilding...");
             let _ = app.emit("tunnel-disconnected", ());
             consecutive_failures = 0;
+
+            let state = app.state::<TunnelState>();
+            std::thread::sleep(Duration::from_secs(rebuild_delay));
+            match start_tunnel_inner(&config, &state, &app) {
+                Ok(()) => {
+                    println!("[TAURI] Tunnel rebuilt successfully");
+                    let _ = app.emit("tunnel-reconnected", ());
+                    rebuild_delay = 2;
+                }
+                Err(e) => {
+                    println!("[TAURI] Tunnel rebuild failed: {}", e);
+                    rebuild_delay = std::cmp::min(rebuild_delay * 2, 60);
+                }
+            }
         }
     }
 }
