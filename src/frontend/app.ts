@@ -171,8 +171,13 @@ class App {
     (terminal as any).registerLinkProvider(new FileLinkProvider(terminal, (filePath) => {
       this.openFileInEditor(filePath);
     }));
+    // xterm.js open() requires the container to be visible
+    container.style.display = 'block';
     terminal.open(container);
     fitAddon.fit();
+    container.classList.remove('active');
+    container.style.display = 'none';
+    container.style.zIndex = '';
 
     const onDataDisposable = terminal.onData((data) => {
       if (this.ws?.readyState === WebSocket.OPEN && this.activeSessionId === sessionId) {
@@ -400,6 +405,7 @@ class App {
       this.logDebug('connect() aborted: activeSessionId mismatch');
       return;
     }
+    this.logDebug('location=' + window.location.href + ' proto=' + window.location.protocol + ' host=' + window.location.host);
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws?sessionId=${sessionId}`;
     this.logDebug('WS URL: ' + wsUrl);
@@ -471,14 +477,14 @@ class App {
       }
     };
 
-    ws.onclose = () => {
-      this.logDebug('WS close');
+    ws.onclose = (ev) => {
+      this.logDebug('WS close code=' + ev.code + ' reason=' + ev.reason);
       this.stopHeartbeat();
       this.scheduleReconnect(sessionId);
     };
 
     ws.onerror = (e) => {
-      this.logDebug('WS error');
+      this.logDebug('WS error: ' + JSON.stringify(e));
       ws.close();
     };
   }
