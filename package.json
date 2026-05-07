@@ -12,9 +12,10 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "dev": "tsc --watch",
-    "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tunnel": "node scripts/tunnel.js",
+    "tunnel:daemon": "node scripts/tunnel.js daemon",
+    "tunnel:stop": "node scripts/tunnel.js stop",
+    "tunnel:status": "node scripts/tunnel.js status"
   },
   "dependencies": {
     "better-sqlite3": "^12.9.0",

@@ -1,6 +1,6 @@
 # Claude Session Manager (CSM)
 
-在浏览器或 Mac 桌面 App 中远程管理 Linux 服务器上的 Claude Code 会话。
+在浏览器中远程管理 Linux 服务器上的 Claude Code 会话。
 
 ![CSM Screenshot](image/app.png)
 
@@ -10,8 +10,8 @@
 - **Web 终端** — 基于 xterm.js 的完整终端模拟器，支持彩色输出、文件路径点击跳转
 - **内联代码编辑器** — 点击终端中的文件路径即可在侧边栏打开 CodeMirror 编辑器，直接修改远程文件
 - **会话持久化** — 服务器重启后会话列表自动恢复，支持 `claude --resume` 恢复到之前的对话
-- **Mac 桌面 App** — Tauri 封装的原生应用，自动管理 SSH 隧道，自带连接向导
-- **实时通知** — Claude 回复完成后自动发送系统通知（浏览器 + macOS）
+- **SSH Tunnel CLI** — 轻量 Node.js 脚本自动管理 SSH 隧道，断线自动重连
+- **实时通知** — Claude 回复完成后自动发送浏览器通知
 
 ## 架构
 
@@ -25,7 +25,7 @@
 │  │  - Code editor sidebar                              │   │
 │  └─────────────────────────────────────────────────────┘   │
 │              ↑ WebSocket / HTTP                              │
-│              │ SSH tunnel (Tauri auto-manages)               │
+│              │ SSH tunnel (CLI auto-manages)                 │
 ├──────────────┼──────────────────────────────────────────────┤
 │  Linux Server│                                              │
 │  ┌───────────┴─────────────────────────────────────────┐   │
@@ -42,7 +42,7 @@
 
 - **Backend**: Node.js 20+, TypeScript, Express, ws (WebSocket), node-pty, better-sqlite3
 - **Frontend**: Vanilla TypeScript, xterm.js 5.x, xterm-addon-fit, CodeMirror 6 (CDN)
-- **Mac App**: Tauri v2 (Rust), system `ssh` client for port forwarding
+- **Tunnel Manager**: Node.js CLI, system `ssh` client for port forwarding
 
 ## 服务器端部署
 
@@ -92,64 +92,71 @@ systemctl --user status csm
 
 服务器启动后监听 `http://0.0.0.0:9090`。
 
-## Mac App 安装
+## Mac 客户端（浏览器 + Tunnel CLI）
 
 ### 前置要求
 
-- macOS 10.13+
-- [Rust](https://rustup.rs/)（用于编译 Tauri）
+- macOS / Linux / Windows（任何能跑 Node.js 和 SSH 的系统）
 - Node.js 20+
+- SSH 客户端（macOS/Linux 自带，Windows 可用 Git Bash 或 WSL）
 
-### 编译步骤
+### 安装
 
 ```bash
 # 1. 克隆仓库
 git clone https://github.com/Haven-1999/claude-session-manager.git
 cd claude-session-manager
 
-# 2. 安装依赖
+# 2. 安装依赖（仅 tunnel 脚本需要）
 npm install
-
-# 3. 编译前端
-npm run build
-
-# 4. 编译 Mac App
-npm run tauri:build
 ```
-
-输出目录：`src-tauri/target/universal-apple-darwin/release/bundle/macos/Claude Session Manager.app`
 
 ### 首次使用
 
-1. 双击 `.app` 打开
-2. 在 Setup 页面填写 SSH 连接信息：
+1. **配置 SSH 连接信息**
+   ```bash
+   npm run tunnel config
+   ```
+   按提示填写：
    - **SSH Host**: 你的服务器地址
    - **SSH User**: 登录用户名
    - **SSH Port**: 22（默认）
    - **Remote CSM Port**: 9090（服务器端端口）
    - **Local Port**: 18080（本地转发端口，可改）
    - **SSH Identity File**: `~/.ssh/id_rsa`（私钥路径）
-3. 点击 **Connect**，Tauri 会自动：
-   - 启动 `ssh -L` 隧道
-   - 等待端口就绪
-   - 打开 CSM 主界面
 
-### 切换服务器
+2. **启动隧道（前台模式，日志直接输出到终端）**
+   ```bash
+   npm run tunnel start
+   ```
 
-点击顶部栏的 **Settings** 按钮，即可回到 Setup 页面修改配置后重新连接。
+   或 **后台模式（推荐日常使用）**
+   ```bash
+   npm run tunnel daemon
+   ```
+
+3. **浏览器打开 CSM**
+   ```bash
+   open http://127.0.0.1:18080
+   ```
+
+### 常用命令
+
+| 命令 | 作用 |
+|------|------|
+| `npm run tunnel start` | 前台启动隧道，Ctrl+C 停止 |
+| `npm run tunnel daemon` | 后台启动隧道，日志写入 `~/.csm/tunnel.log` |
+| `npm run tunnel stop` | 停止后台隧道 |
+| `npm run tunnel status` | 查看隧道是否在运行 |
+| `npm run tunnel config` | 重新配置 SSH 连接信息 |
 
 ## 使用说明
 
-### 浏览器访问（无需 Tauri）
-
-如果不需要 Mac App，直接用浏览器访问：
+### 手动 SSH 隧道（不想用 CLI 时）
 
 ```bash
-# 手动建立 SSH 隧道
 ssh -N -L 18080:localhost:9090 user@your-server
-
-# 浏览器打开
-open http://localhost:18080
+open http://127.0.0.1:18080
 ```
 
 ### 创建会话
@@ -187,8 +194,8 @@ npm run build:frontend
 # 运行测试
 npm test
 
-# Tauri 开发模式
-npm run tauri:dev
+# Tunnel CLI 开发模式
+npm run tunnel start
 ```
 
 ## 数据存储
@@ -197,14 +204,13 @@ npm run tauri:dev
 |------|------|--------------|
 | `~/.csm/sessions.db` | CSM 会话列表 + 输出历史 | 是 |
 | `~/.claude/sessions/*.json` | Claude CLI 会话元数据 | 是 |
-| `~/Library/Application Support/com.claude-session-manager/config.json` | Mac App SSH 配置 | 是（仅 Mac）|
+| `~/.csm/tunnel.json` | SSH Tunnel CLI 配置 | 是（仅客户端）|
 
 ## 已知问题
 
 1. **xterm.js 初始化** — 容器必须在可见状态下调用 `terminal.open()`，否则退化为纯文本显示
 2. **Claude session ID 映射** — CSM UUID 和 Claude 内部 session ID 是独立系统。首次启动时异步读取 `~/.claude/sessions/<pid>.json` 建立映射，如读取超时则本次无法 resume
-3. **SSH 隧道断连** — 网络波动后 Tauri 不会自动重连，需点击 Settings 重新 Connect
-4. **弹窗兼容性** — Tauri WebView 不支持原生 `alert()`，已替换为自定义 DOM modal
+3. **SSH 隧道断连** — Tunnel CLI 已内置自动重连，10 秒检测一次，连续 2 次失败自动重建
 
 ## License
 
