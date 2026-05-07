@@ -88,37 +88,7 @@ fn main() {
     app.run(|app_handle, event| {
         match event {
             tauri::RunEvent::Ready => {
-                println!("[TAURI] App ready, checking config...");
-                if let Some(cfg) = config::get_config(app_handle.clone()) {
-                    println!("[TAURI] Config found, auto-starting tunnel to {}:{} -> localhost:{}",
-                        cfg.ssh_host, cfg.remote_csm_port, cfg.local_port);
-                    let app_clone = app_handle.clone();
-                    let cfg_clone = cfg.clone();
-                    let local_port = cfg.local_port;
-                    std::thread::spawn(move || {
-                        let state = app_clone.state::<tunnel::TunnelState>();
-                        match tunnel::start_tunnel_inner(&cfg_clone, &*state, &app_clone) {
-                            Ok(_) => {
-                                println!("[TAURI] Tunnel started, waiting for port {} to be ready...", local_port);
-                                for _ in 0..30 {
-                                    if tunnel::check_connection(local_port) {
-                                        println!("[TAURI] Port ready, opening CSM window");
-                                        let url = format!("http://localhost:{}", local_port);
-                                        let _ = open_csm_window(app_clone, url);
-                                        return;
-                                    }
-                                    std::thread::sleep(std::time::Duration::from_millis(500));
-                                }
-                                println!("[TAURI] Port {} did not become ready in 15s", local_port);
-                            }
-                            Err(e) => {
-                                println!("[TAURI] Auto-start tunnel failed: {}", e);
-                            }
-                        }
-                    });
-                } else {
-                    println!("[TAURI] No config found, staying on setup page");
-                }
+                println!("[TAURI] App ready, staying on setup page");
             }
             tauri::RunEvent::Exit => {
                 let state = app_handle.state::<tunnel::TunnelState>();

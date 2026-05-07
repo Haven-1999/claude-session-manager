@@ -8,13 +8,14 @@ export interface PtyOptions {
   claudePath: string;
   cols?: number;
   rows?: number;
+  resume?: boolean;
 }
 
 export function spawnPty(options: PtyOptions): pty.IPty {
-  const { cwd, sessionId, claudePath, cols = 120, rows = 30 } = options;
+  const { cwd, sessionId, claudePath, cols = 120, rows = 30, resume = false } = options;
   const shell = process.platform === 'win32' ? 'powershell.exe' : claudePath;
-  const args = process.platform === 'win32' ? [] : [];
-  console.log(`[CSM PTY] spawn: ${shell} ${args.join(' ')} in ${cwd} (${cols}x${rows})`);
+  const args = resume ? ['resume'] : [];
+  console.log(`[CSM PTY] spawn: ${shell} ${args.join(' ')} in ${cwd} (${cols}x${rows}) resume=${resume}`);
 
   const proc = pty.spawn(shell, args, {
     name: 'xterm-256color',

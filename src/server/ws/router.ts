@@ -55,15 +55,18 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
 
       const cols = pendingResize?.cols ?? 120;
       const rows = pendingResize?.rows ?? 30;
+      const history = manager.getOutputHistory(session!.id);
+      const shouldResume = history.length > 0;
 
       try {
-        console.log(`[CSM WS] Spawning PTY for session ${session!.id} in ${session!.cwd} (${cols}x${rows})`);
+        console.log(`[CSM WS] Spawning PTY for session ${session!.id} in ${session!.cwd} (${cols}x${rows}) resume=${shouldResume}`);
         const pty = spawnPty({
           cwd: session!.cwd,
           sessionId: session!.id,
           claudePath,
           cols,
           rows,
+          resume: shouldResume,
         });
         session!.ptyProcess = pty;
         isSpawning = false;
