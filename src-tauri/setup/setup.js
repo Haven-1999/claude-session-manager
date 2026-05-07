@@ -86,6 +86,9 @@ async function doConnect(config) {
         await invoke('open_csm_window', { url: csmUrl });
         console.log('[SETUP] open_csm_window OK');
         await new Promise((r) => setTimeout(r, 500));
+        console.log('[SETUP] Starting tunnel monitor...');
+        await invoke('start_tunnel_monitor');
+        console.log('[SETUP] start_tunnel_monitor OK');
         const current = getCurrentWebviewWindow();
         await current.close();
       } catch (e) {

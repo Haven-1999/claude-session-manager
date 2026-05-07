@@ -124,6 +124,10 @@ class App {
 
     this.loadSessions();
 
+    if (this.isTauri) {
+      this.setupTauriTunnelListeners();
+    }
+
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
@@ -225,23 +229,24 @@ class App {
     }
   }
 
-  private async loadSessions(retry = 3): Promise<void> {
+  private async loadSessions(): Promise<void> {
+    this.logDebug('loadSessions: location=' + window.location.href);
+    const start = performance.now();
     try {
       this.logDebug('Fetching sessions...');
-      const res = await fetch('/api/sessions');
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      const res = await fetch('/api/sessions', { signal: controller.signal });
+      clearTimeout(timeout);
+      const elapsed = Math.round(performance.now() - start);
       if (!res.ok) {
-        this.logDebug('fetch /api/sessions failed: ' + res.status);
-        if (retry > 0) {
-          this.logDebug('Retrying loadSessions in 1s...');
-          setTimeout(() => this.loadSessions(retry - 1), 1000);
-        } else {
-          this.sessionList.render([], null);
-          this.sessionInfo.render(null);
-        }
+        this.logDebug('fetch /api/sessions HTTP ' + res.status + ' after ' + elapsed + 'ms');
+        this.sessionList.render([], null);
+        this.sessionInfo.render(null);
         return;
       }
       this.sessions = await res.json();
-      this.logDebug('Loaded ' + this.sessions.length + ' sessions');
+      this.logDebug('Loaded ' + this.sessions.length + ' sessions in ' + elapsed + 'ms');
       this.sessionList.render(this.sessions, this.activeSessionId);
       if (this.sessions.length > 0 && !this.activeSessionId) {
         this.logDebug('Auto-switch to first session');
@@ -251,14 +256,11 @@ class App {
         this.activeSessionId = null;
       }
     } catch (e) {
-      this.logDebug('loadSessions error: ' + (e as Error).message);
-      if (retry > 0) {
-        this.logDebug('Retrying loadSessions in 1s...');
-        setTimeout(() => this.loadSessions(retry - 1), 1000);
-      } else {
-        this.sessionList.render([], null);
-        this.sessionInfo.render(null);
-      }
+      const elapsed = Math.round(performance.now() - start);
+      const err = e as Error;
+      this.logDebug('loadSessions error after ' + elapsed + 'ms: ' + err.name + ': ' + err.message);
+      this.sessionList.render([], null);
+      this.sessionInfo.render(null);
     }
   }
 
@@ -799,6 +801,37 @@ class App {
       }
     } catch (e) {
       console.error('openSettings error:', e);
+    }
+  }
+
+  private async setupTauriTunnelListeners(): Promise<void> {
+    try {
+      let listen: (event: string, handler: (event: any) => void) => Promise<() => void>;
+      const tauri = (window as any).__TAURI__;
+      if (tauri?.event?.listen) {
+        listen = tauri.event.listen.bind(tauri.event);
+      } else {
+        // @ts-ignore dynamic import from CDN for Tauri v2 event API
+        const mod = await import('https://esm.sh/@tauri-apps/api@2.0.0/event');
+        listen = mod.listen;
+      }
+
+      await listen('tunnel-disconnected', () => {
+        this.logDebug('Tauri event: tunnel-disconnected');
+        this.disconnect();
+        this.showOverlay('SSH tunnel disconnected. Waiting for reconnect...');
+      });
+
+      await listen('tunnel-reconnected', () => {
+        this.logDebug('Tauri event: tunnel-reconnected');
+        this.hideOverlay();
+        this.loadSessions();
+        if (this.activeSessionId) {
+          this.connect(this.activeSessionId);
+        }
+      });
+    } catch (e) {
+      this.logDebug('Failed to setup Tauri tunnel listeners: ' + (e as Error).message);
     }
   }
 }

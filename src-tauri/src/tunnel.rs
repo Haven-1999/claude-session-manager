@@ -4,12 +4,14 @@ use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tauri::{command, AppHandle, Manager, State};
+use tauri::{command, AppHandle, Emitter, Manager, State};
 
 pub struct TunnelState {
     pub child: Mutex<Option<Child>>,
+    pub monitor_running: Mutex<bool>,
+    pub config: Mutex<Option<AppConfig>>,
 }
 
 fn ssh_log_path(app: &AppHandle) -> PathBuf {
@@ -158,12 +160,51 @@ pub fn start_tunnel(
     state: State<TunnelState>,
     app: AppHandle,
 ) -> Result<(), String> {
-    start_tunnel_inner(&config, &state, &app)
+    start_tunnel_inner(&config, &state, &app)?;
+    // Save config for monitor
+    {
+        let mut guard = state.config.lock().map_err(|e| e.to_string())?;
+        *guard = Some(config);
+    }
+    Ok(())
 }
 
 #[command]
 pub fn stop_tunnel(state: State<TunnelState>) -> Result<(), String> {
+    stop_monitor(&state);
     kill_tunnel(&state);
+    {
+        let mut guard = state.config.lock().map_err(|e| e.to_string())?;
+        *guard = None;
+    }
+    Ok(())
+}
+
+#[command]
+pub fn start_tunnel_monitor(
+    state: State<'_, TunnelState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let config: AppConfig;
+    {
+        let guard = state.config.lock().map_err(|e| e.to_string())?;
+        config = guard.clone().ok_or("No tunnel config found. Connect first.")?;
+    }
+
+    // Stop any existing monitor
+    stop_monitor(&state);
+
+    // Start new monitor
+    {
+        let mut guard = state.monitor_running.lock().map_err(|e| e.to_string())?;
+        *guard = true;
+    }
+
+    std::thread::spawn(move || {
+        monitor_tunnel(config, app);
+    });
+
+    println!("[TAURI] Tunnel monitor started");
     Ok(())
 }
 
@@ -196,4 +237,37 @@ fn http_health_check(local_port: u16) -> bool {
 #[command]
 pub fn check_connection(local_port: u16) -> bool {
     http_health_check(local_port)
+}
+
+pub fn monitor_tunnel(
+    config: AppConfig,
+    app: AppHandle,
+) {
+    let mut consecutive_failures = 0u32;
+    loop {
+        std::thread::sleep(Duration::from_secs(10));
+
+        if http_health_check(config.local_port) {
+            if consecutive_failures > 0 {
+                println!("[TAURI] Tunnel health check recovered");
+                let _ = app.emit("tunnel-reconnected", ());
+            }
+            consecutive_failures = 0;
+            continue;
+        }
+
+        consecutive_failures += 1;
+        println!("[TAURI] Tunnel health check failed ({}/2)", consecutive_failures);
+
+        if consecutive_failures >= 2 {
+            println!("[TAURI] Tunnel deemed dead, emitting disconnect event");
+            let _ = app.emit("tunnel-disconnected", ());
+            consecutive_failures = 0;
+        }
+    }
+}
+
+pub fn stop_monitor(state: &TunnelState) {
+    let mut guard = state.monitor_running.lock().unwrap();
+    *guard = false;
 }

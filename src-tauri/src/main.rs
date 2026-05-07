@@ -67,6 +67,8 @@ fn main() {
     let app = tauri::Builder::default()
         .manage(tunnel::TunnelState {
             child: Mutex::new(None),
+            monitor_running: Mutex::new(false),
+            config: Mutex::new(None),
         })
         .invoke_handler(tauri::generate_handler![
             config::get_config,
@@ -74,6 +76,7 @@ fn main() {
             tunnel::start_tunnel,
             tunnel::stop_tunnel,
             tunnel::check_connection,
+            tunnel::start_tunnel_monitor,
             open_settings,
             open_csm_window,
             close_window,
