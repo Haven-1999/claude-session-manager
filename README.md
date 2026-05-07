@@ -17,7 +17,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  Mac (Tauri App / Browser)                                  │
+│  Mac / Linux / Windows (Browser)                            │
 │  ┌─────────────────────────────────────────────────────┐   │
 │  │ Frontend (xterm.js + CodeMirror)                    │   │
 │  │  - Session list sidebar                             │   │
@@ -150,6 +150,13 @@ npm install
 | `npm run tunnel status` | 查看隧道是否在运行 |
 | `npm run tunnel config` | 重新配置 SSH 连接信息 |
 
+### Tunnel CLI 工作原理
+
+1. **启动 SSH 进程**：调用系统 `ssh -N -L` 建立端口转发，带 `ServerAliveInterval=30` 等参数保持连接
+2. **健康检查**：每 10 秒用 `HEAD /api/sessions` 检测本地端口是否可用
+3. **自动重连**：连续 2 次健康检查失败 → 杀掉旧 SSH 进程 → 清理端口占用 → 重新建立隧道
+4. **退避策略**：重建失败后间隔时间指数增长（2s → 4s → 8s... 最大 60s），避免频繁重试
+
 ## 使用说明
 
 ### 手动 SSH 隧道（不想用 CLI 时）
@@ -210,7 +217,6 @@ npm run tunnel start
 
 1. **xterm.js 初始化** — 容器必须在可见状态下调用 `terminal.open()`，否则退化为纯文本显示
 2. **Claude session ID 映射** — CSM UUID 和 Claude 内部 session ID 是独立系统。首次启动时异步读取 `~/.claude/sessions/<pid>.json` 建立映射，如读取超时则本次无法 resume
-3. **SSH 隧道断连** — Tunnel CLI 已内置自动重连，10 秒检测一次，连续 2 次失败自动重建
 
 ## License
 
