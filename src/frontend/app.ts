@@ -5,6 +5,30 @@ import { SessionInfo } from './components/session-info.js';
 import { CodeEditorPanel } from './components/code-editor.js';
 import { FileLinkProvider } from './components/file-link-provider.js';
 
+function showAlert(message: string): void {
+  const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
+  if (!isTauri) {
+    showAlert(message);
+    return;
+  }
+  // Tauri WebView blocks window.alert — use custom DOM modal
+  const existing = document.querySelector('.alert-overlay');
+  if (existing) existing.remove();
+  const overlay = document.createElement('div');
+  overlay.className = 'alert-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:200;';
+  overlay.innerHTML = `
+    <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:20px;width:360px;max-width:90vw;box-shadow:0 8px 24px rgba(0,0,0,0.4);">
+      <div style="font-size:14px;color:#e6edf3;margin-bottom:16px;white-space:pre-wrap;">${message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+      <div style="display:flex;justify-content:flex-end;">
+        <button id="alert-ok" style="background:#58a6ff;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;">OK</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#alert-ok')!.addEventListener('click', () => overlay.remove());
+}
+
 interface SessionSummary {
   id: string;
   name: string;
@@ -63,13 +87,13 @@ class App {
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({ error: 'Unknown error' }));
-          alert('Failed to save file: ' + (err.error || res.statusText));
+          showAlert('Failed to save file: ' + (err.error || res.statusText));
           return;
         }
         console.log('[CSM] Saved file:', path);
       } catch (e) {
         console.error('Save file error:', e);
-        alert('Error saving file. Check console.');
+        showAlert('Error saving file. Check console.');
       }
     };
 
@@ -299,7 +323,7 @@ class App {
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Unknown error' }));
         this.logDebug(`Create session failed: ${err.error || res.statusText}`);
-        alert('Failed to create session: ' + (err.error || res.statusText));
+        showAlert('Failed to create session: ' + (err.error || res.statusText));
         return;
       }
       const session: SessionSummary = await res.json();
@@ -310,7 +334,7 @@ class App {
     } catch (e) {
       const msg = (e as Error).message;
       this.logDebug('Create session exception: ' + msg);
-      alert('Error creating session: ' + msg);
+      showAlert('Error creating session: ' + msg);
     }
   }
 
@@ -596,7 +620,7 @@ class App {
           }
         }
         const err = await res.json().catch(() => ({ error: 'Unknown error' }));
-        alert('Failed to open file: ' + (err.error || res.statusText));
+        showAlert('Failed to open file: ' + (err.error || res.statusText));
         return;
       }
       const data = await res.json();
@@ -604,7 +628,7 @@ class App {
       document.getElementById('code-editor')!.classList.remove('hidden');
     } catch (e) {
       console.error('Open file error:', e);
-      alert('Error opening file. Check console.');
+      showAlert('Error opening file. Check console.');
     }
   }
 
