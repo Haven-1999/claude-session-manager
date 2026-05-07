@@ -225,14 +225,19 @@ class App {
     }
   }
 
-  private async loadSessions(): Promise<void> {
+  private async loadSessions(retry = 3): Promise<void> {
     try {
       this.logDebug('Fetching sessions...');
       const res = await fetch('/api/sessions');
       if (!res.ok) {
         this.logDebug('fetch /api/sessions failed: ' + res.status);
-        this.sessionList.render([], null);
-        this.sessionInfo.render(null);
+        if (retry > 0) {
+          this.logDebug('Retrying loadSessions in 1s...');
+          setTimeout(() => this.loadSessions(retry - 1), 1000);
+        } else {
+          this.sessionList.render([], null);
+          this.sessionInfo.render(null);
+        }
         return;
       }
       this.sessions = await res.json();
@@ -247,8 +252,13 @@ class App {
       }
     } catch (e) {
       this.logDebug('loadSessions error: ' + (e as Error).message);
-      this.sessionList.render([], null);
-      this.sessionInfo.render(null);
+      if (retry > 0) {
+        this.logDebug('Retrying loadSessions in 1s...');
+        setTimeout(() => this.loadSessions(retry - 1), 1000);
+      } else {
+        this.sessionList.render([], null);
+        this.sessionInfo.render(null);
+      }
     }
   }
 
