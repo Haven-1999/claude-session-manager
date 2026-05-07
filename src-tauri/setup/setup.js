@@ -80,7 +80,7 @@ async function doConnect(config) {
     console.log('[SETUP] check_connection attempt', i + 1, '=>', ok);
     if (ok) {
       showStatus('Connected! Opening CSM...', 'success');
-      const csmUrl = 'http://localhost:' + config.local_port;
+      const csmUrl = 'http://127.0.0.1:' + config.local_port;
       console.log('[SETUP] Step 4: open_csm_window', csmUrl);
       try {
         await invoke('open_csm_window', { url: csmUrl });
