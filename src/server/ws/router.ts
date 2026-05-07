@@ -73,6 +73,7 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
         session!.ptyProcess = pty;
         const pid = (pty as any).pid as number;
         console.log(`[CSM WS] PTY spawned, PID: ${pid}`);
+        const spawnTime = Date.now();
 
         // Capture Claude's session ID asynchronously
         if (!session!.claudeSessionId) {
@@ -89,8 +90,23 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
           broadcastToSession(session!, data);
         });
         pty.onExit(({ exitCode }) => {
-          console.log(`[CSM WS] PTY exited for session ${session!.id}, code: ${exitCode}`);
+          const elapsed = Date.now() - spawnTime;
+          console.log(`[CSM WS] PTY exited for session ${session!.id}, code: ${exitCode}, elapsed=${elapsed}ms`);
           session!.ptyProcess = null;
+
+          // If PTY exited quickly with resume, the claudeSessionId is stale
+          if (resumeClaudeId && elapsed < 3000) {
+            console.log(`[CSM WS] PTY exited quickly with resume — clearing stale claudeSessionId and retrying fresh`);
+            session!.claudeSessionId = null;
+            manager.saveClaudeSessionId(session!.id, null);
+            setTimeout(() => {
+              if (!session!.ptyProcess && session!.status !== 'stopped') {
+                ensurePty();
+              }
+            }, 500);
+            return;
+          }
+
           manager.updateStatus(session!.id, 'stopped');
           broadcastStatus(session!);
         });
