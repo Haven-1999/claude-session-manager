@@ -98,7 +98,7 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
           if (resumeClaudeId && elapsed < 3000) {
             console.log(`[CSM WS] PTY exited quickly with resume — clearing stale claudeSessionId and retrying fresh`);
             session!.claudeSessionId = null;
-            manager.saveClaudeSessionId(session!.id, null);
+            manager.saveClaudeSessionId(session!.id, '');
             setTimeout(() => {
               if (!session!.ptyProcess && session!.status !== 'stopped') {
                 ensurePty();
