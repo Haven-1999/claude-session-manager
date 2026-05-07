@@ -244,10 +244,12 @@ html, body, #app {
 }
 
 .terminal-panel .xterm {
+  width: 100%;
   height: 100%;
   border-radius: var(--radius);
   background: #0d1117;
   overflow: hidden;
+  font-variant-ligatures: none;
 }
 
 /* Connection Overlay */

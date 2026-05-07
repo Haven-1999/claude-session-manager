@@ -143,10 +143,11 @@ class App {
     const terminal = new Terminal({
       cursorBlink: true,
       fontSize: 14,
-      fontFamily: 'Menlo, Monaco, "Courier New", "PingFang SC", monospace',
+      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
       allowProposedApi: true,
       convertEol: true,
       screenReaderMode: false,
+      unicodeVersion: '11',
       theme: {
         background: '#0d1117',
         foreground: '#e6edf3',
@@ -175,10 +176,9 @@ class App {
     (terminal as any).registerLinkProvider(new FileLinkProvider(terminal, (filePath) => {
       this.openFileInEditor(filePath);
     }));
-    // xterm.js open() requires the container to be visible
+    // xterm.js renderer needs the container visible during open() to init canvas properly
     container.style.display = 'block';
     terminal.open(container);
-    fitAddon.fit();
     container.classList.remove('active');
     container.style.display = 'none';
     container.style.zIndex = '';
