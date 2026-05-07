@@ -104,7 +104,7 @@ export class SessionManager {
   }
 
   restoreSessions(): void {
-    const records = this.memory.loadNonStoppedSessions();
+    const records = this.memory.loadAllSessions();
     for (const r of records) {
       this.sessions.set(r.id, {
         id: r.id,

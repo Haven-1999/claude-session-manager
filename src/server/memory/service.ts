@@ -75,8 +75,8 @@ export class MemoryService {
     return rows.map(r => r.cwd);
   }
 
-  loadNonStoppedSessions(): SessionRecord[] {
-    return this.db.prepare(`SELECT * FROM sessions WHERE status != 'stopped' ORDER BY last_active_at DESC`).all() as SessionRecord[];
+  loadAllSessions(): SessionRecord[] {
+    return this.db.prepare(`SELECT * FROM sessions ORDER BY last_active_at DESC`).all() as SessionRecord[];
   }
 
   appendOutput(sessionId: string, data: string): void {
