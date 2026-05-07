@@ -20,6 +20,7 @@ export class CodeEditorPanel {
   private saveBtn: HTMLButtonElement;
   private closeBtn: HTMLButtonElement;
   onSave?: (path: string, content: string) => Promise<void> | void;
+  onClose?: () => void;
 
   constructor(parent: HTMLElement) {
     this.container = document.createElement('div');
@@ -132,6 +133,7 @@ export class CodeEditorPanel {
     if (this.tabs.length === 0) {
       this.activeIndex = -1;
       this.hide();
+      this.onClose?.();
     } else {
       const newIndex = Math.min(index, this.tabs.length - 1);
       this.activeIndex = -1; // force switch

@@ -78,6 +78,10 @@ class App {
     this.sessionInfo = new SessionInfo(document.getElementById('session-info-content')!);
 
     this.codeEditor = new CodeEditorPanel(document.getElementById('code-editor-content')!);
+    this.codeEditor.onClose = () => {
+      document.getElementById('code-editor')!.classList.add('hidden');
+      this.fitActiveTerminal();
+    };
     this.codeEditor.onSave = async (path, content) => {
       try {
         const res = await fetch('/api/files', {

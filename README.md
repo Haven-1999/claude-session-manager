@@ -2,7 +2,7 @@
 
 在浏览器中远程管理 Linux 服务器上的 Claude Code 会话。
 
-![CSM Screenshot](image/app.png)
+![CSM Screenshot](image/app1.png)
 
 ## 功能特性
 

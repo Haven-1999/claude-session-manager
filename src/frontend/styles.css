@@ -548,6 +548,17 @@ html, body, #app {
   flex: 1;
   overflow: hidden;
   background: #0d1117;
+  font-family: 'Menlo', Monaco, 'Courier New', monospace;
+  font-size: 13px;
+}
+
+.code-editor-body .cm-editor {
+  height: 100%;
+}
+
+.code-editor-body .cm-scroller {
+  font-family: 'Menlo', Monaco, 'Courier New', monospace !important;
+  font-size: 13px;
 }
 
 .session-info-content {
