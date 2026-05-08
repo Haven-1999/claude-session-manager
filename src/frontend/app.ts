@@ -1,5 +1,6 @@
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
+import { oneDarkTheme, oneLightTheme } from './xterm-themes.js';
 import { SessionList } from './components/session-list.js';
 import { SessionInfo } from './components/session-info.js';
 import { CodeEditorPanel } from './components/code-editor.js';
@@ -160,57 +161,13 @@ class App {
     container.id = `terminal-panel-${sessionId}`;
     panels.appendChild(container);
 
-    const isDark = this.settings.data.theme === 'dark';
-    const xtermTheme = isDark
-      ? {
-          background: '#0d1117',
-          foreground: '#e6edf3',
-          cursor: '#58a6ff',
-          selectionBackground: '#264f78',
-          black: '#0d1117',
-          red: '#f85149',
-          green: '#3fb950',
-          yellow: '#d29922',
-          blue: '#58a6ff',
-          magenta: '#bc8cff',
-          cyan: '#39c5cf',
-          white: '#e6edf3',
-          brightBlack: '#484f58',
-          brightRed: '#ff7b72',
-          brightGreen: '#56d364',
-          brightYellow: '#e3b341',
-          brightBlue: '#79c0ff',
-          brightMagenta: '#d2a8ff',
-          brightCyan: '#56d4dd',
-          brightWhite: '#ffffff',
-        }
-      : {
-          background: '#ffffff',
-          foreground: '#1f2328',
-          cursor: '#0969da',
-          selectionBackground: '#b4d7ff',
-          black: '#1f2328',
-          red: '#cf222e',
-          green: '#1a7f37',
-          yellow: '#9a6700',
-          blue: '#0969da',
-          magenta: '#8250df',
-          cyan: '#1b7c83',
-          white: '#24292f',
-          brightBlack: '#57606a',
-          brightRed: '#cf222e',
-          brightGreen: '#1a7f37',
-          brightYellow: '#9a6700',
-          brightBlue: '#0969da',
-          brightMagenta: '#8250df',
-          brightCyan: '#1b7c83',
-          brightWhite: '#1f2328',
-        };
+    const xtermTheme = this.settings.data.theme === 'dark' ? oneDarkTheme : oneLightTheme;
 
     const terminal = new Terminal({
       cursorBlink: true,
       fontSize: this.settings.data.terminalFontSize,
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      minimumContrastRatio: 4.5,
       allowProposedApi: true,
       convertEol: true,
       screenReaderMode: false,
@@ -727,25 +684,7 @@ class App {
     themeBtn.textContent = isDark ? '☀' : '🌙';
     themeBtn.title = isDark ? 'Switch to Light' : 'Switch to Dark';
 
-    const xtermTheme = isDark
-      ? {
-          background: '#0d1117', foreground: '#e6edf3', cursor: '#58a6ff',
-          selectionBackground: '#264f78', black: '#0d1117', red: '#f85149',
-          green: '#3fb950', yellow: '#d29922', blue: '#58a6ff',
-          magenta: '#bc8cff', cyan: '#39c5cf', white: '#e6edf3',
-          brightBlack: '#484f58', brightRed: '#ff7b72', brightGreen: '#56d364',
-          brightYellow: '#e3b341', brightBlue: '#79c0ff', brightMagenta: '#d2a8ff',
-          brightCyan: '#56d4dd', brightWhite: '#ffffff',
-        }
-      : {
-          background: '#ffffff', foreground: '#1f2328', cursor: '#0969da',
-          selectionBackground: '#b4d7ff', black: '#1f2328', red: '#cf222e',
-          green: '#1a7f37', yellow: '#9a6700', blue: '#0969da',
-          magenta: '#8250df', cyan: '#1b7c83', white: '#24292f',
-          brightBlack: '#57606a', brightRed: '#cf222e', brightGreen: '#1a7f37',
-          brightYellow: '#9a6700', brightBlue: '#0969da', brightMagenta: '#8250df',
-          brightCyan: '#1b7c83', brightWhite: '#1f2328',
-        };
+    const xtermTheme = isDark ? oneDarkTheme : oneLightTheme;
 
     for (const entry of this.terminals.values()) {
       (entry.terminal as any).options.fontSize = data.terminalFontSize;
@@ -1003,8 +942,10 @@ class App {
         this.logDebug(`Image uploaded to: ${result.path}`);
 
         if (this.ws?.readyState === WebSocket.OPEN && this.activeSessionId) {
-          const inputData = result.path + ' ';
-          this.ws.send(JSON.stringify({ type: 'input', data: inputData }));
+          const displayPath = result.path.startsWith('/root/')
+            ? result.path.replace(/^\/root\//, '~/')
+            : result.path;
+          this.ws.send(JSON.stringify({ type: 'input', data: displayPath }));
         }
       } catch (err) {
         showAlert('Error uploading image: ' + (err as Error).message);
