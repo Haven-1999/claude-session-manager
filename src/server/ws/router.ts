@@ -11,6 +11,8 @@ interface WsMessage {
   rows?: number;
 }
 
+const OUTPUT_BUFFER_MAX_LINES = 500;
+
 export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManager, claudePath: string): void {
   manager.onStatusChange = (id, status) => {
     const session = manager.getSession(id);
@@ -88,6 +90,10 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
         pty.onData((data) => {
           manager.touch(session!.id);
           broadcastToSession(session!, data);
+          session!.outputBuffer.push(data);
+          if (session!.outputBuffer.length > OUTPUT_BUFFER_MAX_LINES) {
+            session!.outputBuffer.shift();
+          }
         });
         pty.onExit(({ exitCode }) => {
           const elapsed = Date.now() - spawnTime;
@@ -134,6 +140,16 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
     manager.attachClient(sessionId, ws);
     broadcastStatus(session);
     ws.send(JSON.stringify({ type: 'status', status: session.status }));
+
+    // Replay in-memory output buffer so reconnecting clients see recent terminal state
+    if (session.ptyProcess && session.outputBuffer.length > 0) {
+      console.log(`[CSM WS] Replaying ${session.outputBuffer.length} buffered lines for session ${session.id}`);
+      for (const chunk of session.outputBuffer) {
+        if (ws.readyState === ws.OPEN) {
+          ws.send(JSON.stringify({ type: 'output', data: chunk }));
+        }
+      }
+    }
 
     // Eagerly spawn PTY if not already running so the user sees output immediately
     if (!session.ptyProcess && session.status !== 'stopped') {

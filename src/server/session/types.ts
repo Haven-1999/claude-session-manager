@@ -13,6 +13,7 @@ export interface Session {
   createdAt: number;
   lastActiveAt: number;
   claudeSessionId?: string | null;
+  outputBuffer: string[];
 }
 
 export interface SessionRecord {

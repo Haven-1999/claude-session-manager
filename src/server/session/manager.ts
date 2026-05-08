@@ -20,6 +20,7 @@ export class SessionManager {
       ptyProcess: null,
       clients: new Set(),
       claudeSessionId: record.claude_session_id,
+      outputBuffer: [],
     };
     this.sessions.set(session.id, session);
     return session;
@@ -125,6 +126,7 @@ export class SessionManager {
         ptyProcess: null,
         clients: new Set(),
         claudeSessionId: r.claude_session_id,
+        outputBuffer: [],
       });
     }
   }
