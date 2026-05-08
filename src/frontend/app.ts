@@ -462,9 +462,7 @@ class App {
     }
     this.logDebug('location=' + window.location.href + ' proto=' + window.location.protocol + ' host=' + window.location.host);
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const entry = this.terminals.get(sessionId);
-    const isResume = entry != null && (entry.terminal as any).buffer?.active?.length > 0;
-    const wsUrl = `${protocol}//${window.location.host}/ws?sessionId=${sessionId}${isResume ? '&resume=1' : ''}`;
+    const wsUrl = `${protocol}//${window.location.host}/ws?sessionId=${sessionId}`;
     this.logDebug('WS URL: ' + wsUrl);
 
     // Preflight: verify HTTP layer is reachable before opening WS
