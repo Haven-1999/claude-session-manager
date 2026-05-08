@@ -610,7 +610,7 @@ html, body, #app {
 .xterm-decoration-container .xterm-decoration-file-link {
   text-decoration: underline;
   cursor: pointer;
-  color: #58a6ff !important;
+  color: var(--accent) !important;
 }
 
 .xterm-decoration-container .xterm-decoration-file-link:hover {
@@ -624,8 +624,8 @@ body[data-theme="light"] {
   --bg-tertiary: #eaeef2;
   --bg-hover: #d0d7de;
   --fg-primary: #1f2328;
-  --fg-secondary: #656d76;
-  --fg-muted: #8c959f;
+  --fg-secondary: #4b5563;
+  --fg-muted: #57606a;
   --accent: #0969da;
   --accent-hover: #0550ae;
   --border: #d0d7de;
