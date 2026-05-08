@@ -356,6 +356,12 @@ html, body, #app {
   border-color: var(--accent);
 }
 
+.modal input[type="radio"],
+.modal input[type="checkbox"] {
+  width: auto;
+  accent-color: var(--accent);
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;
