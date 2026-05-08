@@ -14,6 +14,9 @@
   --error: #f85149;
   --shadow: 0 1px 3px rgba(0,0,0,0.3);
   --radius: 8px;
+  --active-item-bg: rgba(88, 166, 255, 0.12);
+  --debug-panel-bg: rgba(13, 17, 23, 0.92);
+  --link-hover-bg: rgba(88, 166, 255, 0.15);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -135,7 +138,7 @@ html, body, #app {
 }
 
 .session-item.active {
-  background: rgba(88, 166, 255, 0.12);
+  background: var(--active-item-bg);
   color: var(--accent);
 }
 
@@ -247,7 +250,7 @@ html, body, #app {
   width: 100%;
   height: 100%;
   border-radius: var(--radius);
-  background: #0d1117;
+  background: var(--bg-primary);
   overflow: hidden;
   font-variant-ligatures: none;
 }
@@ -547,7 +550,7 @@ html, body, #app {
 .code-editor-body {
   flex: 1;
   overflow: hidden;
-  background: #0d1117;
+  background: var(--bg-primary);
   font-family: 'Menlo', Monaco, 'Courier New', monospace;
   font-size: 13px;
 }
@@ -563,18 +566,23 @@ html, body, #app {
 
 .session-info-content {
   flex-shrink: 0;
-  max-height: 140px;
+  max-height: min(45vh, 260px);
   overflow-y: auto;
   padding: 8px;
   font-size: 12px;
+  word-break: break-all;
 }
+
+.session-info-content::-webkit-scrollbar { width: 6px; }
+.session-info-content::-webkit-scrollbar-track { background: transparent; }
+.session-info-content::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 3px; }
 
 /* Debug Panel */
 .debug-panel {
   position: absolute;
   bottom: 8px;
   right: 8px;
-  background: rgba(13, 17, 23, 0.92);
+  background: var(--debug-panel-bg);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 8px 12px;
@@ -602,5 +610,26 @@ html, body, #app {
 }
 
 .xterm-decoration-container .xterm-decoration-file-link:hover {
-  background: rgba(88, 166, 255, 0.15);
+  background: var(--link-hover-bg);
+}
+
+/* Light Theme Overrides */
+body[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6f8fa;
+  --bg-tertiary: #eaeef2;
+  --bg-hover: #d0d7de;
+  --fg-primary: #1f2328;
+  --fg-secondary: #656d76;
+  --fg-muted: #8c959f;
+  --accent: #0969da;
+  --accent-hover: #0550ae;
+  --border: #d0d7de;
+  --success: #1a7f37;
+  --warning: #9a6700;
+  --error: #cf222e;
+  --shadow: 0 1px 3px rgba(31, 35, 40, 0.12);
+  --active-item-bg: rgba(9, 105, 218, 0.10);
+  --debug-panel-bg: rgba(246, 248, 250, 0.95);
+  --link-hover-bg: rgba(9, 105, 218, 0.12);
 }
