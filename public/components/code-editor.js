@@ -13,6 +13,7 @@ export class CodeEditorPanel {
     closeBtn;
     onSave;
     onClose;
+    isDark = true;
     constructor(parent) {
         this.container = document.createElement('div');
         this.container.className = 'code-editor-panel hidden';
@@ -47,6 +48,7 @@ export class CodeEditorPanel {
         const existing = this.tabs.findIndex(t => t.path === path);
         if (existing !== -1) {
             this.switchTab(existing);
+            this.tabs[this.activeIndex].view.focus();
             return;
         }
         const langModule = await this.loadLanguage(path);
@@ -79,12 +81,66 @@ export class CodeEditorPanel {
         this.renderTabs();
         this.updateUI();
         this.container.classList.remove('hidden');
+        tab.view.focus();
     }
     hide() {
         this.container.classList.add('hidden');
     }
     isOpen() {
         return !this.container.classList.contains('hidden');
+    }
+    async setTheme(isDark) {
+        if (this.isDark === isDark)
+            return;
+        this.isDark = isDark;
+        const activePath = this.activeIndex >= 0 ? this.tabs[this.activeIndex].path : null;
+        const newTabs = [];
+        for (const tab of this.tabs) {
+            const content = tab.view.state.doc.toString();
+            tab.view.destroy();
+            const langModule = await this.loadLanguage(tab.path);
+            const themeExt = isDark
+                ? oneDark
+                : EditorView.theme({
+                    '&': { backgroundColor: '#ffffff', color: '#1f2328', height: '100%' },
+                    '.cm-scroller': { overflow: 'auto', backgroundColor: '#ffffff' },
+                    '.cm-gutters': { backgroundColor: '#f6f8fa', color: '#656d76', borderRight: '1px solid #d0d7de' },
+                    '.cm-activeLineGutter': { backgroundColor: '#eaeef2' },
+                    '.cm-activeLine': { backgroundColor: '#eaeef2' },
+                    '.cm-selectionBackground': { backgroundColor: '#b4d7ff' },
+                    '.cm-cursor': { borderLeftColor: '#0969da' },
+                });
+            const view = new EditorView({
+                doc: content,
+                extensions: [
+                    basicSetup,
+                    themeExt,
+                    EditorView.theme({
+                        '&': { height: '100%' },
+                        '.cm-scroller': { overflow: 'auto' },
+                    }),
+                    ...(langModule ? [langModule] : []),
+                ],
+                parent: this.editorEl,
+            });
+            const newTab = {
+                path: tab.path,
+                view,
+                originalContent: tab.originalContent,
+                isDirty: tab.isDirty,
+            };
+            newTabs.push(newTab);
+            if (tab.path !== activePath) {
+                view.dom.style.display = 'none';
+            }
+        }
+        this.tabs = newTabs;
+        this.activeIndex = activePath ? this.tabs.findIndex(t => t.path === activePath) : -1;
+        if (this.activeIndex >= 0) {
+            this.editorEl.appendChild(this.tabs[this.activeIndex].view.dom);
+            this.tabs[this.activeIndex].view.focus();
+        }
+        this.updateUI();
     }
     switchTab(index) {
         if (index === this.activeIndex || index < 0 || index >= this.tabs.length)

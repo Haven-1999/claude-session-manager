@@ -74,6 +74,10 @@ class App {
     this.debugEl = document.getElementById('debug-panel')!;
     this.logDebug('App starting...');
 
+    if (!this.debugEl) {
+      console.warn('[CSM] debug-panel element not found — DOM may be stale');
+    }
+
     this.sessionList = new SessionList(document.getElementById('session-list-content')!, {
       onSelect: (id) => this.switchSession(id),
       onNew: () => this.showCreateModal(),
@@ -123,14 +127,6 @@ class App {
     document.getElementById('btn-new')!.addEventListener('click', () => this.showCreateModal());
     document.getElementById('btn-debug')!.addEventListener('click', () => this.toggleDebugPanel());
 
-    document.getElementById('btn-font-dec')!.addEventListener('click', () => {
-      const next = Math.max(10, this.settings.data.terminalFontSize - 1);
-      this.settings.set('terminalFontSize', next);
-    });
-    document.getElementById('btn-font-inc')!.addEventListener('click', () => {
-      const next = Math.min(22, this.settings.data.terminalFontSize + 1);
-      this.settings.set('terminalFontSize', next);
-    });
     document.getElementById('btn-theme')!.addEventListener('click', () => {
       const next = this.settings.data.theme === 'dark' ? 'light' : 'dark';
       this.settings.set('theme', next);
@@ -1023,6 +1019,8 @@ class App {
     if (this.debugLines.length > 20) this.debugLines.shift();
     if (this.debugEl) {
       this.debugEl.textContent = this.debugLines.join('\n');
+    } else {
+      console.log('[CSM Debug]', line);
     }
   }
 

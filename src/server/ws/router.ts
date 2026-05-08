@@ -86,6 +86,7 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
 
         isSpawning = false;
         pty.onData((data) => {
+          manager.touch(session!.id);
           broadcastToSession(session!, data);
         });
         pty.onExit(({ exitCode }) => {
@@ -154,6 +155,7 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
       try {
         const msg: WsMessage = JSON.parse(raw.toString());
         console.log(`[CSM WS] Message from ${sessionId}: type=${msg.type}`);
+        manager.touch(sessionId);
         if (msg.type === 'input' && msg.data) {
           if (session!.ptyProcess) {
             session!.ptyProcess.write(msg.data);

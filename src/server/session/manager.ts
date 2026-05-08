@@ -104,6 +104,14 @@ export class SessionManager {
     }
   }
 
+  touch(id: string): void {
+    const s = this.sessions.get(id);
+    if (!s) return;
+    const now = Date.now();
+    s.lastActiveAt = now;
+    this.memory.updateSession(id, { last_active_at: now });
+  }
+
   restoreSessions(): void {
     const records = this.memory.loadAllSessions();
     for (const r of records) {
