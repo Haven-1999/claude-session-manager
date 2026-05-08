@@ -59,6 +59,7 @@ class App {
   private isTauri: boolean;
   private heartbeatTimer: number | null = null;
   private notificationTimer: number | null = null;
+  private originalTitle = document.title;
   private windowFocused = true;
   private resizeDebounceTimer: number | null = null;
   private codeEditor: CodeEditorPanel;
@@ -123,8 +124,20 @@ class App {
       }, 150);
     });
     window.addEventListener('blur', () => { this.windowFocused = false; });
-    window.addEventListener('focus', () => { this.windowFocused = true; });
+    window.addEventListener('focus', () => {
+      this.windowFocused = true;
+      document.title = this.originalTitle;
+    });
     document.addEventListener('paste', (e) => this.handlePaste(e), true);
+
+    // Request notification permission on first user interaction
+    const requestNotify = () => {
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+      document.removeEventListener('click', requestNotify);
+    };
+    document.addEventListener('click', requestNotify);
 
     document.getElementById('btn-new')!.addEventListener('click', () => this.showCreateModal());
     document.getElementById('btn-debug')!.addEventListener('click', () => this.toggleDebugPanel());
@@ -173,6 +186,7 @@ class App {
       screenReaderMode: false,
       unicodeVersion: '11',
       theme: xtermTheme,
+      bellStyle: 'visual',
     });
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
@@ -190,6 +204,10 @@ class App {
       if (this.ws?.readyState === WebSocket.OPEN && this.activeSessionId === sessionId) {
         this.ws.send(JSON.stringify({ type: 'input', data }));
       }
+    });
+
+    (terminal as any).onBell(() => {
+      this.scheduleNotification();
     });
 
     return { terminal, fitAddon, container, onDataDisposable };
@@ -662,6 +680,7 @@ class App {
             console.error('request_attention error:', e);
           }
         }
+        document.title = '● ' + this.originalTitle;
       }
     }, 3000);
   }
