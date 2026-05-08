@@ -751,8 +751,8 @@ class App {
         };
 
     for (const entry of this.terminals.values()) {
-      entry.terminal.options.fontSize = data.terminalFontSize;
-      entry.terminal.options.theme = xtermTheme;
+      (entry.terminal as any).options.fontSize = data.terminalFontSize;
+      (entry.terminal as any).options.theme = xtermTheme;
       requestAnimationFrame(() => entry.fitAddon.fit());
     }
 
