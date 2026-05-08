@@ -807,6 +807,7 @@ class App {
       const data = await res.json();
       await this.codeEditor.open(data.path, data.content);
       document.getElementById('code-editor')!.classList.remove('hidden');
+      this.fitActiveTerminal();
     } catch (e) {
       console.error('Open file error:', e);
       showAlert('Error opening file. Check console.');
