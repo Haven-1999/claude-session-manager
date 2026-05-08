@@ -309,6 +309,10 @@ html, body, #app {
   backdrop-filter: blur(3px);
 }
 
+.modal-overlay.hidden {
+  display: none;
+}
+
 .modal {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
