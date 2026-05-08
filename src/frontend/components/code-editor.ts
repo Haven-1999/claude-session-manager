@@ -21,6 +21,7 @@ export class CodeEditorPanel {
   private closeBtn: HTMLButtonElement;
   onSave?: (path: string, content: string) => Promise<void> | void;
   onClose?: () => void;
+  private isDark = true;
 
   constructor(parent: HTMLElement) {
     this.container = document.createElement('div');
@@ -60,6 +61,7 @@ export class CodeEditorPanel {
     const existing = this.tabs.findIndex(t => t.path === path);
     if (existing !== -1) {
       this.switchTab(existing);
+      this.tabs[this.activeIndex].view.focus();
       return;
     }
 
@@ -97,6 +99,7 @@ export class CodeEditorPanel {
     this.renderTabs();
     this.updateUI();
     this.container.classList.remove('hidden');
+    tab.view.focus();
   }
 
   hide() {
@@ -105,6 +108,59 @@ export class CodeEditorPanel {
 
   isOpen() {
     return !this.container.classList.contains('hidden');
+  }
+
+  async setTheme(isDark: boolean): Promise<void> {
+    if (this.isDark === isDark) return;
+    this.isDark = isDark;
+    const activePath = this.activeIndex >= 0 ? this.tabs[this.activeIndex].path : null;
+    const newTabs: EditorTab[] = [];
+    for (const tab of this.tabs) {
+      const content = tab.view.state.doc.toString();
+      tab.view.destroy();
+      const langModule = await this.loadLanguage(tab.path);
+      const themeExt = isDark
+        ? oneDark
+        : EditorView.theme({
+            '&': { backgroundColor: '#ffffff', color: '#1f2328', height: '100%' },
+            '.cm-scroller': { overflow: 'auto', backgroundColor: '#ffffff' },
+            '.cm-gutters': { backgroundColor: '#f6f8fa', color: '#656d76', borderRight: '1px solid #d0d7de' },
+            '.cm-activeLineGutter': { backgroundColor: '#eaeef2' },
+            '.cm-activeLine': { backgroundColor: '#eaeef2' },
+            '.cm-selectionBackground': { backgroundColor: '#b4d7ff' },
+            '.cm-cursor': { borderLeftColor: '#0969da' },
+          });
+      const view = new EditorView({
+        doc: content,
+        extensions: [
+          basicSetup,
+          themeExt,
+          EditorView.theme({
+            '&': { height: '100%' },
+            '.cm-scroller': { overflow: 'auto' },
+          }),
+          ...(langModule ? [langModule] : []),
+        ],
+        parent: this.editorEl,
+      });
+      const newTab: EditorTab = {
+        path: tab.path,
+        view,
+        originalContent: tab.originalContent,
+        isDirty: tab.isDirty,
+      };
+      newTabs.push(newTab);
+      if (tab.path !== activePath) {
+        view.dom.style.display = 'none';
+      }
+    }
+    this.tabs = newTabs;
+    this.activeIndex = activePath ? this.tabs.findIndex(t => t.path === activePath) : -1;
+    if (this.activeIndex >= 0) {
+      this.editorEl.appendChild(this.tabs[this.activeIndex].view.dom);
+      this.tabs[this.activeIndex].view.focus();
+    }
+    this.updateUI();
   }
 
   private switchTab(index: number) {
