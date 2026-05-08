@@ -124,7 +124,8 @@ export class CodeEditorPanel {
         : EditorView.theme({
             '&': { backgroundColor: '#ffffff', color: '#1f2328', height: '100%' },
             '.cm-scroller': { overflow: 'auto', backgroundColor: '#ffffff' },
-            '.cm-gutters': { backgroundColor: '#f6f8fa', color: '#656d76', borderRight: '1px solid #d0d7de' },
+            '.cm-gutters': { backgroundColor: '#f6f8fa', color: '#1f2328', borderRight: '1px solid #d0d7de' },
+            '.cm-lineNumber': { color: '#1f2328' },
             '.cm-activeLineGutter': { backgroundColor: '#eaeef2' },
             '.cm-activeLine': { backgroundColor: '#eaeef2' },
             '.cm-selectionBackground': { backgroundColor: '#b4d7ff' },
