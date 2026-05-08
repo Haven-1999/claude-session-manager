@@ -15,13 +15,17 @@
   }
   </script>
 </head>
-<body>
+<body data-theme="dark">
   <div id="app">
     <header class="top-bar">
       <span class="logo">Claude Session Manager</span>
       <div class="actions">
         <button id="btn-new">+ New Session</button>
         <button id="btn-debug">Debug</button>
+        <button id="btn-font-dec" title="Decrease font size">Aa-</button>
+        <button id="btn-font-inc" title="Increase font size">Aa+</button>
+        <button id="btn-theme" title="Toggle theme">☀</button>
+        <button id="btn-settings">Settings</button>
       </div>
     </header>
     <div class="main-layout">
@@ -41,6 +45,33 @@
         <div class="sidebar-header">Editor</div>
         <div class="code-editor-content" id="code-editor-content"></div>
       </aside>
+    </div>
+    <div id="settings-modal" class="modal-overlay hidden">
+      <div class="modal" style="width: 360px;">
+        <h3>Settings</h3>
+        <div class="field">
+          <label>Theme</label>
+          <div style="display: flex; gap: 12px; margin-top: 6px;">
+            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; font-weight: 400; font-size: 13px;">
+              <input type="radio" name="theme" value="dark" checked> Dark
+            </label>
+            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; font-weight: 400; font-size: 13px;">
+              <input type="radio" name="theme" value="light"> Light
+            </label>
+          </div>
+        </div>
+        <div class="field">
+          <label for="settings-font-size">Terminal Font Size</label>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <input type="range" id="settings-font-size" min="10" max="22" value="14" style="flex: 1;">
+            <span id="settings-font-value" style="min-width: 28px; text-align: right; font-family: Menlo, monospace;">14</span>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" id="settings-reset">Reset to Defaults</button>
+          <button class="btn-primary" id="settings-close">Close</button>
+        </div>
+      </div>
     </div>
   </div>
   <script type="module" src="app.js"></script>
