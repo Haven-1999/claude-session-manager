@@ -860,8 +860,11 @@ class App {
           }),
         });
         if (!res.ok) {
-          const err = await res.json().catch(() => ({ error: 'Unknown error' }));
-          showAlert('Failed to upload image: ' + (err.error || res.statusText));
+          const text = await res.text().catch(() => 'no body');
+          this.logDebug(`Upload failed: HTTP ${res.status} body=${text.slice(0, 200)}`);
+          let errMsg = res.statusText;
+          try { errMsg = JSON.parse(text).error || errMsg; } catch {}
+          showAlert('Failed to upload image: ' + errMsg);
           continue;
         }
         const result = await res.json();

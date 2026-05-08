@@ -91,14 +91,18 @@ export function createHttpServer(manager: SessionManager, options: Pick<ServerOp
   });
 
   app.post('/api/upload', (req, res) => {
-    const { sessionId, filename, data } = req.body;
+    console.log('[CSM UPLOAD] received body keys:', Object.keys(req.body || {}));
+    const { sessionId, filename, data } = req.body || {};
     if (!sessionId || typeof sessionId !== 'string') {
+      console.log('[CSM UPLOAD] reject: missing sessionId');
       return res.status(400).json({ error: 'sessionId is required' });
     }
     if (!filename || typeof filename !== 'string') {
+      console.log('[CSM UPLOAD] reject: missing filename');
       return res.status(400).json({ error: 'filename is required' });
     }
     if (!data || typeof data !== 'string') {
+      console.log('[CSM UPLOAD] reject: missing data');
       return res.status(400).json({ error: 'data is required' });
     }
 
@@ -114,11 +118,14 @@ export function createHttpServer(manager: SessionManager, options: Pick<ServerOp
       const buffer = Buffer.from(data, 'base64');
       const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
       if (buffer.length > MAX_IMAGE_SIZE) {
+        console.log('[CSM UPLOAD] reject: file too large', buffer.length);
         return res.status(413).json({ error: 'File too large (max 10MB)' });
       }
       fs.writeFileSync(filePath, buffer);
+      console.log('[CSM UPLOAD] saved to', filePath);
       res.json({ path: filePath });
     } catch (err: any) {
+      console.error('[CSM UPLOAD] error:', err.message);
       res.status(500).json({ error: err.message });
     }
   });
