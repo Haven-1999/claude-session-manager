@@ -67,12 +67,10 @@ class App {
 
   constructor() {
     this.settings = new Settings();
-    this.applySettings(this.settings.data);
     this.settings.onChange((data) => this.applySettings(data));
 
     this.isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__;
     this.debugEl = document.getElementById('debug-panel')!;
-    this.logDebug('App starting...');
 
     if (!this.debugEl) {
       console.warn('[CSM] debug-panel element not found — DOM may be stale');
@@ -112,6 +110,9 @@ class App {
     };
 
     this.setupEditorResize();
+
+    // Apply initial settings after all components are initialized
+    this.applySettings(this.settings.data);
 
     window.addEventListener('resize', () => {
       if (this.resizeDebounceTimer) clearTimeout(this.resizeDebounceTimer);
@@ -752,7 +753,9 @@ class App {
       requestAnimationFrame(() => entry.fitAddon.fit());
     }
 
-    this.codeEditor.setTheme(isDark).catch(console.error);
+    if (this.codeEditor) {
+      this.codeEditor.setTheme(isDark).catch(console.error);
+    }
   }
 
   private showSettingsModal(): void {
