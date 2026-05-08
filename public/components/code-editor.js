@@ -12,6 +12,7 @@ export class CodeEditorPanel {
     saveBtn;
     closeBtn;
     onSave;
+    onClose;
     constructor(parent) {
         this.container = document.createElement('div');
         this.container.className = 'code-editor-panel hidden';
@@ -108,6 +109,7 @@ export class CodeEditorPanel {
         if (this.tabs.length === 0) {
             this.activeIndex = -1;
             this.hide();
+            this.onClose?.();
         }
         else {
             const newIndex = Math.min(index, this.tabs.length - 1);

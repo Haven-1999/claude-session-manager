@@ -17,14 +17,6 @@ export class MemoryService {
       );
       CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
       CREATE INDEX IF NOT EXISTS idx_sessions_cwd ON sessions(cwd);
-
-      CREATE TABLE IF NOT EXISTS output_log (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        session_id TEXT NOT NULL,
-        data TEXT NOT NULL,
-        created_at INTEGER NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_output_session ON output_log(session_id);
     `);
     // Migration: add claude_session_id column if missing
     const hasColumn = this.db.prepare(`SELECT COUNT(*) as count FROM pragma_table_info('sessions') WHERE name = 'claude_session_id'`).get() as { count: number };
@@ -73,7 +65,6 @@ export class MemoryService {
   }
 
   deleteSession(id: string): void {
-    this.db.prepare(`DELETE FROM output_log WHERE session_id = ?`).run(id);
     this.db.prepare(`DELETE FROM sessions WHERE id = ?`).run(id);
   }
 
@@ -84,19 +75,6 @@ export class MemoryService {
 
   loadAllSessions(): SessionRecord[] {
     return this.db.prepare(`SELECT * FROM sessions ORDER BY last_active_at DESC`).all() as SessionRecord[];
-  }
-
-  appendOutput(sessionId: string, data: string): void {
-    this.db.prepare(
-      `INSERT INTO output_log (session_id, data, created_at) VALUES (?, ?, ?)`
-    ).run(sessionId, data, Date.now());
-  }
-
-  getOutputHistory(sessionId: string, limit = 10000): string[] {
-    const rows = this.db.prepare(
-      `SELECT data FROM output_log WHERE session_id = ? ORDER BY created_at DESC LIMIT ?`
-    ).all(sessionId, limit) as { data: string }[];
-    return rows.map(r => r.data).reverse();
   }
 
   close(): void {

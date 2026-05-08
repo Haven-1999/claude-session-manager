@@ -86,7 +86,6 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
 
         isSpawning = false;
         pty.onData((data) => {
-          manager.appendOutput(session!.id, data);
           broadcastToSession(session!, data);
         });
         pty.onExit(({ exitCode }) => {
@@ -134,12 +133,6 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
     manager.attachClient(sessionId, ws);
     broadcastStatus(session);
     ws.send(JSON.stringify({ type: 'status', status: session.status }));
-
-    // Send output history so reconnecting clients see prior context
-    const history = manager.getOutputHistory(sessionId);
-    if (history.length > 0) {
-      ws.send(JSON.stringify({ type: 'output', data: history.join('') }));
-    }
 
     // Eagerly spawn PTY if not already running so the user sees output immediately
     if (!session.ptyProcess && session.status !== 'stopped') {

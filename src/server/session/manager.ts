@@ -104,14 +104,6 @@ export class SessionManager {
     }
   }
 
-  appendOutput(id: string, data: string): void {
-    this.memory.appendOutput(id, data);
-  }
-
-  getOutputHistory(id: string): string[] {
-    return this.memory.getOutputHistory(id);
-  }
-
   restoreSessions(): void {
     const records = this.memory.loadAllSessions();
     for (const r of records) {
