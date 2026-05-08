@@ -510,11 +510,6 @@ class App {
       this.updateSessionStatus(sessionId, 'running');
       const entry = this.terminals.get(sessionId);
       if (entry) {
-        // Only clear on reconnect when terminal already has content
-        const buf = (entry.terminal as any).buffer;
-        if (buf && buf.active && buf.active.length > 0) {
-          entry.terminal.write('\x1bc');
-        }
         requestAnimationFrame(() => {
           if (this.ws !== ws || this.activeSessionId !== sessionId) return;
           entry.fitAddon.fit();
