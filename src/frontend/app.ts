@@ -4,6 +4,7 @@ import { SessionList } from './components/session-list.js';
 import { SessionInfo } from './components/session-info.js';
 import { CodeEditorPanel } from './components/code-editor.js';
 import { FileLinkProvider } from './components/file-link-provider.js';
+import { Settings } from './settings.js';
 
 function showAlert(message: string): void {
   const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
@@ -62,8 +63,13 @@ class App {
   private codeEditor: CodeEditorPanel;
   private debugEl: HTMLElement;
   private debugLines: string[] = [];
+  private settings: Settings;
 
   constructor() {
+    this.settings = new Settings();
+    this.applySettings(this.settings.data);
+    this.settings.onChange((data) => this.applySettings(data));
+
     this.isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__;
     this.debugEl = document.getElementById('debug-panel')!;
     this.logDebug('App starting...');
@@ -117,15 +123,25 @@ class App {
     document.getElementById('btn-new')!.addEventListener('click', () => this.showCreateModal());
     document.getElementById('btn-debug')!.addEventListener('click', () => this.toggleDebugPanel());
 
-    if (this.isTauri) {
-      const actions = document.querySelector('.actions')!;
-      const settingsBtn = document.createElement('button');
-      settingsBtn.id = 'btn-settings';
-      settingsBtn.textContent = 'Settings';
-      settingsBtn.style.marginLeft = '8px';
-      settingsBtn.addEventListener('click', () => this.openSettings());
-      actions.appendChild(settingsBtn);
-    }
+    document.getElementById('btn-font-dec')!.addEventListener('click', () => {
+      const next = Math.max(10, this.settings.data.terminalFontSize - 1);
+      this.settings.set('terminalFontSize', next);
+    });
+    document.getElementById('btn-font-inc')!.addEventListener('click', () => {
+      const next = Math.min(22, this.settings.data.terminalFontSize + 1);
+      this.settings.set('terminalFontSize', next);
+    });
+    document.getElementById('btn-theme')!.addEventListener('click', () => {
+      const next = this.settings.data.theme === 'dark' ? 'light' : 'dark';
+      this.settings.set('theme', next);
+    });
+    document.getElementById('btn-settings')!.addEventListener('click', () => {
+      if (this.isTauri) {
+        this.openTauriSettings();
+      } else {
+        this.showSettingsModal();
+      }
+    });
 
     if (this.isTauri) {
       this.setupTauriTunnelListeners().then(() => {
@@ -147,36 +163,62 @@ class App {
     container.id = `terminal-panel-${sessionId}`;
     panels.appendChild(container);
 
+    const isDark = this.settings.data.theme === 'dark';
+    const xtermTheme = isDark
+      ? {
+          background: '#0d1117',
+          foreground: '#e6edf3',
+          cursor: '#58a6ff',
+          selectionBackground: '#264f78',
+          black: '#0d1117',
+          red: '#f85149',
+          green: '#3fb950',
+          yellow: '#d29922',
+          blue: '#58a6ff',
+          magenta: '#bc8cff',
+          cyan: '#39c5cf',
+          white: '#e6edf3',
+          brightBlack: '#484f58',
+          brightRed: '#ff7b72',
+          brightGreen: '#56d364',
+          brightYellow: '#e3b341',
+          brightBlue: '#79c0ff',
+          brightMagenta: '#d2a8ff',
+          brightCyan: '#56d4dd',
+          brightWhite: '#ffffff',
+        }
+      : {
+          background: '#ffffff',
+          foreground: '#1f2328',
+          cursor: '#0969da',
+          selectionBackground: '#b4d7ff',
+          black: '#1f2328',
+          red: '#cf222e',
+          green: '#1a7f37',
+          yellow: '#9a6700',
+          blue: '#0969da',
+          magenta: '#8250df',
+          cyan: '#1b7c83',
+          white: '#656d76',
+          brightBlack: '#656d76',
+          brightRed: '#cf222e',
+          brightGreen: '#1a7f37',
+          brightYellow: '#9a6700',
+          brightBlue: '#0969da',
+          brightMagenta: '#8250df',
+          brightCyan: '#1b7c83',
+          brightWhite: '#1f2328',
+        };
+
     const terminal = new Terminal({
       cursorBlink: true,
-      fontSize: 14,
+      fontSize: this.settings.data.terminalFontSize,
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
       allowProposedApi: true,
       convertEol: true,
       screenReaderMode: false,
       unicodeVersion: '11',
-      theme: {
-        background: '#0d1117',
-        foreground: '#e6edf3',
-        cursor: '#58a6ff',
-        selectionBackground: '#264f78',
-        black: '#0d1117',
-        red: '#f85149',
-        green: '#3fb950',
-        yellow: '#d29922',
-        blue: '#58a6ff',
-        magenta: '#bc8cff',
-        cyan: '#39c5cf',
-        white: '#e6edf3',
-        brightBlack: '#484f58',
-        brightRed: '#ff7b72',
-        brightGreen: '#56d364',
-        brightYellow: '#e3b341',
-        brightBlue: '#79c0ff',
-        brightMagenta: '#d2a8ff',
-        brightCyan: '#56d4dd',
-        brightWhite: '#ffffff',
-      },
+      theme: xtermTheme,
     });
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
@@ -681,6 +723,99 @@ class App {
     }
   }
 
+  private applySettings(data: Readonly<{ theme: 'dark' | 'light'; terminalFontSize: number }>): void {
+    const isDark = data.theme === 'dark';
+    document.body.setAttribute('data-theme', data.theme);
+    const themeBtn = document.getElementById('btn-theme')!;
+    themeBtn.textContent = isDark ? '☀' : '🌙';
+    themeBtn.title = isDark ? 'Switch to Light' : 'Switch to Dark';
+
+    const xtermTheme = isDark
+      ? {
+          background: '#0d1117', foreground: '#e6edf3', cursor: '#58a6ff',
+          selectionBackground: '#264f78', black: '#0d1117', red: '#f85149',
+          green: '#3fb950', yellow: '#d29922', blue: '#58a6ff',
+          magenta: '#bc8cff', cyan: '#39c5cf', white: '#e6edf3',
+          brightBlack: '#484f58', brightRed: '#ff7b72', brightGreen: '#56d364',
+          brightYellow: '#e3b341', brightBlue: '#79c0ff', brightMagenta: '#d2a8ff',
+          brightCyan: '#56d4dd', brightWhite: '#ffffff',
+        }
+      : {
+          background: '#ffffff', foreground: '#1f2328', cursor: '#0969da',
+          selectionBackground: '#b4d7ff', black: '#1f2328', red: '#cf222e',
+          green: '#1a7f37', yellow: '#9a6700', blue: '#0969da',
+          magenta: '#8250df', cyan: '#1b7c83', white: '#656d76',
+          brightBlack: '#656d76', brightRed: '#cf222e', brightGreen: '#1a7f37',
+          brightYellow: '#9a6700', brightBlue: '#0969da', brightMagenta: '#8250df',
+          brightCyan: '#1b7c83', brightWhite: '#1f2328',
+        };
+
+    for (const entry of this.terminals.values()) {
+      entry.terminal.options.fontSize = data.terminalFontSize;
+      entry.terminal.options.theme = xtermTheme;
+      requestAnimationFrame(() => entry.fitAddon.fit());
+    }
+
+    this.codeEditor.setTheme(isDark).catch(console.error);
+  }
+
+  private showSettingsModal(): void {
+    const modal = document.getElementById('settings-modal')!;
+    const closeBtn = document.getElementById('settings-close')!;
+    const resetBtn = document.getElementById('settings-reset')!;
+    const fontSlider = document.getElementById('settings-font-size') as HTMLInputElement;
+    const fontValue = document.getElementById('settings-font-value')!;
+    const themeRadios = modal.querySelectorAll<HTMLInputElement>('input[name="theme"]');
+
+    for (const radio of themeRadios) {
+      radio.checked = radio.value === this.settings.data.theme;
+    }
+    fontSlider.value = String(this.settings.data.terminalFontSize);
+    fontValue.textContent = String(this.settings.data.terminalFontSize);
+
+    modal.classList.remove('hidden');
+
+    const onThemeChange = (e: Event) => {
+      const value = (e.target as HTMLInputElement).value as 'dark' | 'light';
+      this.settings.set('theme', value);
+    };
+    for (const radio of themeRadios) {
+      radio.addEventListener('change', onThemeChange);
+    }
+
+    const onFontInput = () => {
+      const value = parseInt(fontSlider.value, 10);
+      fontValue.textContent = String(value);
+      this.settings.set('terminalFontSize', value);
+    };
+    fontSlider.addEventListener('input', onFontInput);
+
+    const closeModal = () => {
+      for (const radio of themeRadios) {
+        radio.removeEventListener('change', onThemeChange);
+      }
+      fontSlider.removeEventListener('input', onFontInput);
+      resetBtn.removeEventListener('click', onReset);
+      closeBtn.removeEventListener('click', closeModal);
+      modal.classList.add('hidden');
+    };
+
+    const onReset = () => {
+      this.settings.reset();
+      for (const radio of themeRadios) {
+        radio.checked = radio.value === this.settings.data.theme;
+      }
+      fontSlider.value = String(this.settings.data.terminalFontSize);
+      fontValue.textContent = String(this.settings.data.terminalFontSize);
+    };
+
+    closeBtn.addEventListener('click', closeModal);
+    resetBtn.addEventListener('click', onReset);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+  }
+
   private showOverlay(text: string): void {
     const el = document.getElementById('connection-overlay')!;
     el.textContent = text;
@@ -891,7 +1026,7 @@ class App {
     }
   }
 
-  private async openSettings(): Promise<void> {
+  private async openTauriSettings(): Promise<void> {
     try {
       const tauri = (window as any).__TAURI__;
       if (tauri && tauri.core && tauri.core.invoke) {
