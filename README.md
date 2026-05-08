@@ -2,7 +2,8 @@
 
 在浏览器中远程管理 Linux 服务器上的 Claude Code 会话。
 
-![CSM Screenshot](image/app1.png)
+![CSM Screenshot Dark](image/app1.png)
+![CSM Screenshot Light](image/app2.png)
 
 ## 功能特性
 
@@ -13,16 +14,49 @@
 - **SSH Tunnel CLI** — 轻量 Node.js 脚本自动管理 SSH 隧道，断线自动重连
 - **实时通知** — Claude 回复完成后自动发送浏览器通知
 
+## 设计特点
+
+### 终端
+- 内置 One Dark / One Light 两套主题，字体大小可在 10–22px 之间调节，最小对比度设置为 4.5
+- 终端输出的文件路径通过自定义 LinkProvider 识别为可点击链接，支持绝对路径、相对路径以及带空格的路径（引号包裹）
+- 每个会话维护一个 500 行的输出缓冲区，WebSocket 断线重连后自动向客户端回放，避免内容丢失
+
+### 代码编辑器
+- CodeMirror 6 侧边栏编辑器支持多标签页，标签显示未保存标记，关闭前提示确认
+- 按文件扩展名自动加载对应语言包，目前支持 TypeScript、JavaScript、Rust、Python、JSON、HTML、CSS、Markdown、C/C++、Shell、SQL
+- 支持 Cmd+S / Ctrl+S 保存，主题随全局设置同步切换深色/浅色
+
+### 连接稳定性
+- WebSocket 层实现 35 秒心跳超时检测，客户端断开后按退避策略自动重连
+- Tunnel CLI 每 10 秒对本地端口执行 HTTP 健康检查，连续 2 次失败后自动重建 SSH 隧道，重试间隔按指数退避增长（2s → 4s → 8s… 最大 60s）
+- PTY 进程在最后一个客户端断开时保持运行，新客户端连接后可直接恢复交互，无需等待进程重启
+
+### 安全
+- 服务端可选 Basic Auth，通过环境变量或启动参数配置
+- 文件读写 API 对请求路径做 `path.resolve` 规范化，拒绝非绝对路径，防止目录遍历
+- 读取文件时采样前 8KB 内容检测空字节，判定为二进制则拒绝编辑；单文件编辑上限 1MB，上传上限 10MB
+- Tunnel CLI 默认启用 `StrictHostKeyChecking=accept-new`、`ServerAliveInterval=30`、`TCPKeepAlive=yes` 等 SSH 参数
+
+### 部署方式
+- 提供 Docker 镜像，支持数据卷挂载持久化
+- 可作为 systemd 用户服务运行，普通用户即可配置开机自启
+- 浏览器直接访问，无需安装额外客户端
+
+### 会话生命周期
+- 会话状态分为 `running`（有客户端连接）、`disconnected`（无客户端但 PTY 进程仍在）、`stopped`（PTY 已退出）三种
+- 会话元数据、最后活跃时间戳、Claude session ID 通过 SQLite 持久化，服务端重启后自动加载恢复
+- 首次启动 PTY 时异步读取 `~/.claude/sessions/<pid>.json` 获取 Claude 内部 session ID，用于后续 `claude --resume`；若 resume 后进程在 3 秒内退出，则判定 session ID 已失效，清空后重新启动新会话
+
 ## 架构
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  Mac / Linux / Windows (Browser)                            │
 │  ┌─────────────────────────────────────────────────────┐   │
-│  │ Frontend (xterm.js + CodeMirror)                    │   │
+│  │ Frontend (xterm.js + CodeMirror 6)                  │   │
 │  │  - Session list sidebar                             │   │
 │  │  - Terminal panels (WebSocket → PTY)              │   │
-│  │  - Code editor sidebar                              │   │
+│  │  - Code editor sidebar (multi-tab)                  │   │
 │  └─────────────────────────────────────────────────────┘   │
 │              ↑ WebSocket / HTTP                              │
 │              │ SSH tunnel (CLI auto-manages)                 │
@@ -31,7 +65,7 @@
 │  ┌───────────┴─────────────────────────────────────────┐   │
 │  │ CSM Node.js Backend                                 │   │
 │  │  - Express REST API (/api/sessions, /api/files)    │   │
-│  │  - WebSocket router (input/resize/ping)            │   │
+│  │  - WebSocket router (input/resize/ping/buffer)     │   │
 │  │  - node-pty spawns `claude` process                │   │
 │  │  - SQLite persists sessions + output history       │   │
 │  └─────────────────────────────────────────────────────┘   │
@@ -41,7 +75,7 @@
 ## 技术栈
 
 - **Backend**: Node.js 20+, TypeScript, Express, ws (WebSocket), node-pty, better-sqlite3
-- **Frontend**: Vanilla TypeScript, xterm.js 5.x, xterm-addon-fit, CodeMirror 6 (CDN)
+- **Frontend**: Vanilla TypeScript, xterm.js 5.x, xterm-addon-fit, CodeMirror 6 (ESM CDN)
 - **Tunnel Manager**: Node.js CLI, system `ssh` client for port forwarding
 
 ## 服务器端部署
@@ -155,7 +189,7 @@ npm install
 1. **启动 SSH 进程**：调用系统 `ssh -N -L` 建立端口转发，带 `ServerAliveInterval=30` 等参数保持连接
 2. **健康检查**：每 10 秒用 `HEAD /api/sessions` 检测本地端口是否可用
 3. **自动重连**：连续 2 次健康检查失败 → 杀掉旧 SSH 进程 → 清理端口占用 → 重新建立隧道
-4. **退避策略**：重建失败后间隔时间指数增长（2s → 4s → 8s... 最大 60s），避免频繁重试
+4. **退避策略**：重建失败后间隔时间指数增长（2s → 4s → 8s… 最大 60s），避免频繁重试
 
 ## 使用说明
 
