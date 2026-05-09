@@ -233,6 +233,8 @@ class App {
     entry.container.style.zIndex = '1';
     requestAnimationFrame(() => {
       entry!.fitAddon.fit();
+      const terminal = entry!.terminal as any;
+      terminal.refresh(0, terminal.rows - 1);
       requestAnimationFrame(() => {
         if (this.activeSessionId === sessionId) {
           this.sendResize();
