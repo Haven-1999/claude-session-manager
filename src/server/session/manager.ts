@@ -21,6 +21,7 @@ export class SessionManager {
       clients: new Set(),
       claudeSessionId: record.claude_session_id,
       outputBuffer: [],
+      outputBufferStartIndex: 0,
     };
     this.sessions.set(session.id, session);
     return session;
@@ -127,6 +128,7 @@ export class SessionManager {
         clients: new Set(),
         claudeSessionId: r.claude_session_id,
         outputBuffer: [],
+        outputBufferStartIndex: 0,
       });
     }
   }

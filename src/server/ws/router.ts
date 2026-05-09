@@ -13,6 +13,30 @@ interface WsMessage {
 
 const OUTPUT_BUFFER_MAX_LINES = 500;
 
+function parseReplayFrom(value: string | null): number {
+  if (!value) return 0;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function replayBufferedOutput(ws: WebSocket, session: Session, replayFrom: number): void {
+  if (!session.ptyProcess || session.outputBuffer.length === 0) return;
+
+  const relativeStart = Math.max(0, replayFrom - session.outputBufferStartIndex);
+  const startIndex = Math.min(relativeStart, session.outputBuffer.length);
+  const replayCount = session.outputBuffer.length - startIndex;
+  if (replayCount <= 0) return;
+
+  console.log(
+    `[CSM WS] Replaying ${replayCount} buffered chunks for session ${session.id} from absolute index ${replayFrom}`,
+  );
+  for (let i = startIndex; i < session.outputBuffer.length; i += 1) {
+    if (ws.readyState === ws.OPEN) {
+      ws.send(JSON.stringify({ type: 'output', data: session.outputBuffer[i] }));
+    }
+  }
+}
+
 export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManager, claudePath: string): void {
   manager.onStatusChange = (id, status) => {
     const session = manager.getSession(id);
@@ -22,7 +46,8 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
   wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
     const url = new URL(req.url || '/', `http://${req.headers.host}`);
     const sessionId = url.searchParams.get('sessionId');
-    console.log(`[CSM WS] New connection, sessionId=${sessionId}, url=${req.url}`);
+    const replayFrom = parseReplayFrom(url.searchParams.get('replayFrom'));
+    console.log(`[CSM WS] New connection, sessionId=${sessionId}, replayFrom=${replayFrom}, url=${req.url}`);
     if (!sessionId) {
       console.log('[CSM WS] Reject: missing sessionId');
       ws.close(1008, 'Missing sessionId');
@@ -93,6 +118,7 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
           session!.outputBuffer.push(data);
           if (session!.outputBuffer.length > OUTPUT_BUFFER_MAX_LINES) {
             session!.outputBuffer.shift();
+            session!.outputBufferStartIndex += 1;
           }
         });
         pty.onExit(({ exitCode }) => {
@@ -141,15 +167,7 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
     broadcastStatus(session);
     ws.send(JSON.stringify({ type: 'status', status: session.status }));
 
-    // Replay in-memory output buffer so reconnecting clients see recent terminal state
-    if (session.ptyProcess && session.outputBuffer.length > 0) {
-      console.log(`[CSM WS] Replaying ${session.outputBuffer.length} buffered lines for session ${session.id}`);
-      for (const chunk of session.outputBuffer) {
-        if (ws.readyState === ws.OPEN) {
-          ws.send(JSON.stringify({ type: 'output', data: chunk }));
-        }
-      }
-    }
+    replayBufferedOutput(ws, session, replayFrom);
 
     // Eagerly spawn PTY if not already running so the user sees output immediately
     if (!session.ptyProcess && session.status !== 'stopped') {

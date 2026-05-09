@@ -45,6 +45,7 @@ interface TerminalEntry {
   fitAddon: FitAddon;
   container: HTMLElement;
   onDataDisposable: { dispose: () => void } | null;
+  receivedChunks: number;
 }
 
 class App {
@@ -210,7 +211,7 @@ class App {
       this.scheduleNotification();
     });
 
-    return { terminal, fitAddon, container, onDataDisposable };
+    return { terminal, fitAddon, container, onDataDisposable, receivedChunks: 0 };
   }
 
   private showSessionTerminal(sessionId: string): TerminalEntry {
@@ -476,7 +477,9 @@ class App {
     }
     this.logDebug('location=' + window.location.href + ' proto=' + window.location.protocol + ' host=' + window.location.host);
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws?sessionId=${sessionId}`;
+    const entry = this.terminals.get(sessionId);
+    const replayFrom = entry?.receivedChunks ?? 0;
+    const wsUrl = `${protocol}//${window.location.host}/ws?sessionId=${sessionId}&replayFrom=${replayFrom}`;
     this.logDebug('WS URL: ' + wsUrl);
 
     // Preflight: verify HTTP layer is reachable before opening WS
@@ -538,6 +541,7 @@ class App {
           const entry = this.terminals.get(sessionId);
           if (entry) {
             entry.terminal.write(msg.data);
+            entry.receivedChunks += 1;
           }
           const s = this.sessions.find((x) => x.id === sessionId);
           if (s && s.status === 'disconnected') {

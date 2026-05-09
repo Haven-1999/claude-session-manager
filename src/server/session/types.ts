@@ -14,6 +14,7 @@ export interface Session {
   lastActiveAt: number;
   claudeSessionId?: string | null;
   outputBuffer: string[];
+  outputBufferStartIndex: number;
 }
 
 export interface SessionRecord {
