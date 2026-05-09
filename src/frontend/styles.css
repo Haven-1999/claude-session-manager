@@ -360,6 +360,8 @@ html, body, #app {
 .modal input[type="checkbox"] {
   width: auto;
   accent-color: var(--accent);
+  border: 1px solid var(--fg-muted);
+  background: var(--bg-primary);
 }
 
 .modal-actions {

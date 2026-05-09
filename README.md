@@ -2,7 +2,6 @@
 
 在浏览器中远程管理 Linux 服务器上的 Claude Code 会话。
 
-![CSM Screenshot Dark](image/app1.png)
 ![CSM Screenshot Light](image/app2.png)
 
 ## 功能特性
@@ -80,7 +79,18 @@
 
 ## 服务器端部署
 
-### 方式一：Docker（推荐）
+### 方式一：源码运行
+
+在 Linux 服务器上安装依赖、构建并启动服务：
+
+```bash
+npm install
+npm run build && npm start -- --host 0.0.0.0 --port 9090
+```
+
+服务启动后监听 `http://0.0.0.0:9090`，客户端可通过浏览器直接访问，或通过下文的 SSH Tunnel CLI 转发到本地端口。
+
+### 方式二：Docker
 
 ```bash
 docker run -d \
