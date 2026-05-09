@@ -44,6 +44,20 @@ export class CodeEditorPanel {
             }
         });
     }
+    getThemeExtension() {
+        return this.isDark
+            ? oneDark
+            : EditorView.theme({
+                '&': { backgroundColor: '#ffffff', color: '#1f2328', height: '100%' },
+                '.cm-scroller': { overflow: 'auto', backgroundColor: '#ffffff' },
+                '.cm-gutters': { backgroundColor: '#f6f8fa', color: '#1f2328', borderRight: '1px solid #d0d7de' },
+                '.cm-lineNumber': { color: '#1f2328' },
+                '.cm-activeLineGutter': { backgroundColor: '#eaeef2' },
+                '.cm-activeLine': { backgroundColor: '#eaeef2' },
+                '.cm-selectionBackground': { backgroundColor: '#b4d7ff' },
+                '.cm-cursor': { borderLeftColor: '#0969da' },
+            });
+    }
     async open(path, content) {
         const existing = this.tabs.findIndex(t => t.path === path);
         if (existing !== -1) {
@@ -56,7 +70,7 @@ export class CodeEditorPanel {
             doc: content,
             extensions: [
                 basicSetup,
-                oneDark,
+                this.getThemeExtension(),
                 EditorView.theme({
                     '&': { height: '100%' },
                     '.cm-scroller': { overflow: 'auto' },
@@ -99,23 +113,11 @@ export class CodeEditorPanel {
             const content = tab.view.state.doc.toString();
             tab.view.destroy();
             const langModule = await this.loadLanguage(tab.path);
-            const themeExt = isDark
-                ? oneDark
-                : EditorView.theme({
-                    '&': { backgroundColor: '#ffffff', color: '#1f2328', height: '100%' },
-                    '.cm-scroller': { overflow: 'auto', backgroundColor: '#ffffff' },
-                    '.cm-gutters': { backgroundColor: '#f6f8fa', color: '#1f2328', borderRight: '1px solid #d0d7de' },
-                    '.cm-lineNumber': { color: '#1f2328' },
-                    '.cm-activeLineGutter': { backgroundColor: '#eaeef2' },
-                    '.cm-activeLine': { backgroundColor: '#eaeef2' },
-                    '.cm-selectionBackground': { backgroundColor: '#b4d7ff' },
-                    '.cm-cursor': { borderLeftColor: '#0969da' },
-                });
             const view = new EditorView({
                 doc: content,
                 extensions: [
                     basicSetup,
-                    themeExt,
+                    this.getThemeExtension(),
                     EditorView.theme({
                         '&': { height: '100%' },
                         '.cm-scroller': { overflow: 'auto' },
