@@ -17,9 +17,16 @@
   --active-item-bg: rgba(88, 166, 255, 0.12);
   --debug-panel-bg: rgba(13, 17, 23, 0.92);
   --link-hover-bg: rgba(88, 166, 255, 0.15);
+  --selection-bg: rgba(88, 166, 255, 0.35);
+  --selection-fg: #e6edf3;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+
+::selection {
+  background: var(--selection-bg);
+  color: var(--selection-fg);
+}
 
 html, body, #app {
   height: 100%;
@@ -644,4 +651,6 @@ body[data-theme="light"] {
   --active-item-bg: rgba(9, 105, 218, 0.10);
   --debug-panel-bg: rgba(246, 248, 250, 0.95);
   --link-hover-bg: rgba(9, 105, 218, 0.12);
+  --selection-bg: rgba(9, 105, 218, 0.24);
+  --selection-fg: #1f2328;
 }
