@@ -115,6 +115,43 @@ docker run -d \
 http://服务器IP:9090
 ```
 
+### 暴露已有容器的 9090 端口
+
+如果同一台 Linux 服务器上已经存在多个 CSM 容器，并且每个容器内部都监听 `9090`，不要用 `docker run -p ...` 重新创建容器。可以使用 `csm-proxy` 为指定容器自动分配一个 Linux 主机端口，并把该端口转发到容器内部的 `9090`。
+
+`csm-proxy` 运行在 Linux 宿主机上，不运行在 CSM 容器内部。CSM 仍然在各自容器内监听 `9090`；宿主机上的 `csm-proxy` 只负责分配一个主机端口，并把该端口转发到指定容器的 `9090`。
+
+```bash
+npm run build
+csm-proxy expose --container csm-alice
+```
+
+默认端口池是 `9100-9199`。启动成功后会输出类似结果：
+
+```text
+Container: csm-alice
+Target: 172.17.0.2:9090
+Host port: 9137
+Open: http://SERVER_IP:9137
+Proxy process is running in the foreground. Stop it with Ctrl-C, or run it under systemd/tmux if it should stay alive after logout.
+```
+
+如果在普通容器内部运行 `csm-proxy`，它只能绑定该容器自己的网络命名空间，不能直接占用 Linux 宿主机端口。因此用于分配宿主机访问端口的 `csm-proxy` 应在 Linux 宿主机上执行。
+
+浏览器访问输出中的地址即可，例如：
+
+```text
+http://服务器IP:9137
+```
+
+这个方式不会创建新容器。它会在 Linux 主机上启动一个代理进程，同时转发 HTTP 和 WebSocket，因此可以正常使用终端会话。多个用户或多个容器同时使用时，每个实例占用不同的主机端口。已有容器内部仍然可以统一监听 `9090`。
+
+如需使用其他端口池：
+
+```bash
+csm-proxy expose --container csm-bob --port-range 9200-9299
+```
+
 ### 方式三：systemd 用户服务
 
 ```bash
