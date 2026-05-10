@@ -36,11 +36,6 @@
 - 读取文件时采样前 8KB 内容检测空字节，判定为二进制则拒绝编辑；单文件编辑上限 1MB，上传上限 10MB
 - 直接开放 `9090` 端口适合内网、VPN 或受控服务器环境；公网访问建议配合防火墙白名单、HTTPS、认证或反向代理
 
-### 部署方式
-- 在 Linux 服务器上运行 Node.js Web 服务，Mac 端用浏览器直接访问
-- 提供 Docker 镜像，支持数据卷挂载持久化
-- 可作为 systemd 用户服务运行，普通用户即可配置开机自启
-
 ### 会话生命周期
 - 会话状态分为 `running`（有客户端连接）、`disconnected`（无客户端但 PTY 进程仍在）、`stopped`（PTY 已退出）三种
 - 会话元数据、最后活跃时间戳、Claude session ID 通过 SQLite 持久化，服务端重启后自动加载恢复
@@ -59,7 +54,7 @@
                            │ HTTP / WebSocket
                            │ http://SERVER_IP:9090
 ┌──────────────────────────▼──────────────────────────────────┐
-│  Linux Server                                                │
+│  Linux Server                                               │
 │  ┌─────────────────────────────────────────────────────┐    │
 │  │ CSM Node.js Backend                                 │    │
 │  │ - Express REST API (/api/sessions, /api/files)      │    │
@@ -79,72 +74,64 @@
 
 ## 服务器端部署
 
-### 方式一：源码运行
-
-在 Linux 服务器上安装依赖、构建并启动服务：
+### 方式一：Linux 服务器直接运行
 
 ```bash
+# 1. 克隆仓库
+git clone https://github.com/Haven-1999/claude-session-manager.git
+cd claude-session-manager
+
+# 2. 安装依赖
 npm install
-npm run build && npm start -- --host 0.0.0.0 --port 9090
+
+# 3. 构建
+npm run build
+
+# 4. 启动（监听所有接口，端口 9090）
+npm start -- --host 0.0.0.0 --port 9090
 ```
 
-服务启动后，Mac 端不需要安装 CSM。直接用 Safari 或 Chrome 打开：
+浏览器打开 `http://服务器IP:9090` 即可使用。
 
-```text
-http://服务器IP:9090
-```
+> 如果服务器有防火墙，需要放行 `9090` 端口。
 
-如果服务器有防火墙，需要放行 `9090` 端口，或只允许可信 IP 访问。
-
-### 方式二：Docker
+### 方式二：服务器上运行 Docker
 
 ```bash
+# 1. 启动容器
 docker run -d \
   --name csm \
   -p 9090:9090 \
   -v csm-data:/root/.csm \
   -v claude-data:/root/.claude \
   haven1999/claude-session-manager:latest
+
+# 2. 浏览器访问
+# http://服务器IP:9090
 ```
 
 > **重要**：必须同时挂载 `csm-data`（CSM 数据库）和 `claude-data`（Claude 会话文件），否则容器重启后会话丢失。
 
-服务启动后，浏览器访问：
+#### 已有容器端口复用（可选）
 
-```text
-http://服务器IP:9090
-```
-
-### 暴露已有容器的 9090 端口
-
-如果同一台 Linux 服务器上已经存在多个 CSM 容器，并且每个容器内部都监听 `9090`，不要用 `docker run -p ...` 重新创建容器。可以使用 `csm-proxy` 为指定容器自动分配一个 Linux 主机端口，并把该端口转发到容器内部的 `9090`。
-
-`csm-proxy` 运行在 Linux 宿主机上，不运行在 CSM 容器内部。CSM 仍然在各自容器内监听 `9090`；宿主机上的 `csm-proxy` 只负责分配一个主机端口，并把该端口转发到指定容器的 `9090`。
+如果同一台服务器上已有多个 CSM 容器，每个内部都监听 `9090`，可以在宿主机上用 `csm-proxy` 为每个容器分配独立的外部端口：
 
 ```bash
+# 在宿主机上执行
 npm run build
 csm-proxy expose --container csm-alice
 ```
 
-默认端口池是 `9100-9199`。启动成功后会输出类似结果：
+默认端口池 `9100-9199`，成功后会输出类似：
 
 ```text
 Container: csm-alice
 Target: 172.17.0.2:9090
 Host port: 9137
 Open: http://SERVER_IP:9137
-Proxy process is running in the foreground. Stop it with Ctrl-C, or run it under systemd/tmux if it should stay alive after logout.
 ```
 
-如果在普通容器内部运行 `csm-proxy`，它只能绑定该容器自己的网络命名空间，不能直接占用 Linux 宿主机端口。因此用于分配宿主机访问端口的 `csm-proxy` 应在 Linux 宿主机上执行。
-
-浏览器访问输出中的地址即可，例如：
-
-```text
-http://服务器IP:9137
-```
-
-这个方式不会创建新容器。它会在 Linux 主机上启动一个代理进程，同时转发 HTTP 和 WebSocket，因此可以正常使用终端会话。多个用户或多个容器同时使用时，每个实例占用不同的主机端口。已有容器内部仍然可以统一监听 `9090`。
+浏览器访问 `http://SERVER_IP:9137` 即可。多个容器同时使用时每个实例占用不同的主机端口，容器内部仍可统一监听 `9090`。
 
 如需使用其他端口池：
 
@@ -152,54 +139,17 @@ http://服务器IP:9137
 csm-proxy expose --container csm-bob --port-range 9200-9299
 ```
 
-### 方式三：systemd 用户服务
-
-```bash
-# 1. 安装全局命令
-npm install -g claude-session-manager
-
-# 2. 创建 systemd 用户服务
-mkdir -p ~/.config/systemd/user
-cat > ~/.config/systemd/user/csm.service << 'EOF'
-[Unit]
-Description=Claude Session Manager
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=%h/.local/share/fnm/node-versions/v20/bin/csm --host 0.0.0.0 --port 9090
-Restart=on-failure
-Environment="HOME=%h"
-
-[Install]
-WantedBy=default.target
-EOF
-
-# 3. 启动并启用
-systemctl --user daemon-reload
-systemctl --user enable --now csm
-
-# 4. 查看状态
-systemctl --user status csm
-```
-
-服务启动后，浏览器访问：
-
-```text
-http://服务器IP:9090
-```
-
 ## Mac 端访问
 
 CSM 不需要在 Mac 上安装客户端。服务在 Linux 服务器启动后，在 Mac 上用 Safari 或 Chrome 打开：
 
-```text
+```
 http://服务器IP:9090
 ```
 
 例如服务器 IP 是 `192.168.1.20`，访问地址就是：
 
-```text
+```
 http://192.168.1.20:9090
 ```
 
@@ -225,7 +175,7 @@ ssh -N -L 9090:127.0.0.1:9090 user@your-server
 
 然后浏览器打开：
 
-```text
+```
 http://127.0.0.1:9090
 ```
 
