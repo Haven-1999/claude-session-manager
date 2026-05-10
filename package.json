@@ -4,7 +4,8 @@
   "description": "Browser-based session manager for Claude Code on remote servers",
   "main": "dist/index.js",
   "bin": {
-    "csm": "dist/index.js"
+    "csm": "dist/index.js",
+    "csm-proxy": "dist/container-proxy.js"
   },
   "scripts": {
     "build": "tsc && npm run build:frontend",
@@ -12,6 +13,7 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "dev": "tsc --watch",
+    "proxy": "node dist/container-proxy.js",
     "tunnel": "node scripts/tunnel.js",
     "tunnel:daemon": "node scripts/tunnel.js daemon",
     "tunnel:stop": "node scripts/tunnel.js stop",

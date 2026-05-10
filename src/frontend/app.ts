@@ -59,6 +59,8 @@ class App {
   private sessionInfo: SessionInfo;
   private isTauri: boolean;
   private heartbeatTimer: number | null = null;
+  private pongTimeoutTimer: number | null = null;
+  private lastPingTime = 0;
   private notificationTimer: number | null = null;
   private originalTitle = document.title;
   private windowFocused = true;
@@ -534,10 +536,27 @@ class App {
       }, 1200);
     };
 
-    ws.onmessage = (event) => {
+    ws.onmessage = async (event) => {
       if (this.ws !== ws || this.activeSessionId !== sessionId) return;
+      let raw = event.data;
+      const dataType = typeof raw;
+      if (dataType !== 'string') {
+        this.logDebug(`WS received non-string data: type=${dataType} ${raw instanceof Blob ? 'Blob(size=' + raw.size + ')' : ''}`);
+        if (raw instanceof Blob) {
+          try {
+            raw = await raw.text();
+          } catch (e) {
+            this.logDebug('Blob.text() failed: ' + (e as Error).message);
+            return;
+          }
+        } else if (raw instanceof ArrayBuffer) {
+          raw = new TextDecoder().decode(raw);
+        } else {
+          return;
+        }
+      }
       try {
-        const msg = JSON.parse(event.data);
+        const msg = JSON.parse(raw);
         if (msg.type === 'output') {
           this.logDebug(`output: ${msg.data?.length || 0} chars`);
           const entry = this.terminals.get(sessionId);
@@ -554,10 +573,15 @@ class App {
           this.logDebug(`status: ${msg.status}`);
           this.updateSessionStatus(sessionId, msg.status);
         } else if (msg.type === 'pong') {
-          // heartbeat ok
+          if (this.pongTimeoutTimer) {
+            clearTimeout(this.pongTimeoutTimer);
+            this.pongTimeoutTimer = null;
+          }
+          const rtt = this.lastPingTime ? Date.now() - this.lastPingTime : 0;
+          this.logDebug(`pong received, rtt=${rtt}ms`);
         }
-      } catch {
-        // ignore
+      } catch (e) {
+        this.logDebug('WS JSON parse error: ' + (e as Error).message + ' raw=' + String(raw).slice(0, 200));
       }
     };
 
@@ -641,7 +665,11 @@ class App {
   private startHeartbeat(): void {
     this.heartbeatTimer = window.setInterval(() => {
       if (this.ws?.readyState === WebSocket.OPEN) {
+        this.lastPingTime = Date.now();
         this.ws.send(JSON.stringify({ type: 'ping' }));
+        this.pongTimeoutTimer = window.setTimeout(() => {
+          this.logDebug('PONG TIMEOUT — server->client path may be blocked');
+        }, 20000);
       }
     }, 15000);
   }
@@ -650,6 +678,10 @@ class App {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
+    }
+    if (this.pongTimeoutTimer) {
+      clearTimeout(this.pongTimeoutTimer);
+      this.pongTimeoutTimer = null;
     }
   }
 

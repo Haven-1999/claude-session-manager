@@ -35,9 +35,9 @@ describe('SessionManager', () => {
     expect(manager.getSession(s.id)!.name).toBe('new');
   });
 
-  it('marks stopped on close without PTY', () => {
+  it('removes session on close', () => {
     const s = manager.createSession('temp', '/tmp');
     manager.closeSession(s.id);
-    expect(manager.getSession(s.id)!.status).toBe('stopped');
+    expect(manager.getSession(s.id)).toBeUndefined();
   });
 });
