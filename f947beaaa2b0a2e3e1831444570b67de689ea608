@@ -1,0 +1,24 @@
+.gitignore
+  727022b644213cf3 9-17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.13",
+  "base_commit_sha": "f947beaaa2b0a2e3e1831444570b67de689ea608",
+  "prompts": {
+    "727022b644213cf3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ad804e0-de43-48cb-ac44-1897af4a5452",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "konghaiqi <konghaiqi@cvte.com>",
+      "messages": [],
+      "total_additions": 9,
+      "total_deletions": 11,
+      "accepted_lines": 1854,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/6cb59a5423aac4426ae998cfef88779d8ff52258895556299e8cb52054e726db"
+    }
+  }
+}
