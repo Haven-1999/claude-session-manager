@@ -65,7 +65,6 @@ class App {
   private originalTitle = document.title;
   private windowFocused = true;
   private resizeDebounceTimer: number | null = null;
-  private wasMobile: boolean | null = null;
   private codeEditor: CodeEditorPanel;
   private debugEl: HTMLElement;
   private debugLines: string[] = [];
@@ -122,21 +121,7 @@ class App {
     // Apply initial settings after all components are initialized
     this.applySettings(this.settings.data);
 
-    this.wasMobile = window.innerWidth < 768;
     window.addEventListener('resize', () => {
-      const isMobileNow = window.innerWidth < 768;
-      if (this.wasMobile !== null && this.wasMobile !== isMobileNow) {
-        if (this.activeSessionId) {
-          const entry = this.terminals.get(this.activeSessionId);
-          if (entry) {
-            (entry.terminal as any).reset();
-            if (this.ws?.readyState === WebSocket.OPEN) {
-              this.ws.send(JSON.stringify({ type: 'request_buffer' }));
-            }
-          }
-        }
-      }
-      this.wasMobile = isMobileNow;
       if (this.resizeDebounceTimer) clearTimeout(this.resizeDebounceTimer);
       this.resizeDebounceTimer = window.setTimeout(() => {
         this.resizeDebounceTimer = null;
@@ -541,8 +526,7 @@ class App {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const entry = this.terminals.get(sessionId);
     const replayFrom = entry?.receivedChunks ?? 0;
-    const cols = entry ? (entry.terminal as any).cols ?? 120 : 120;
-    const wsUrl = `${protocol}//${window.location.host}/ws?sessionId=${sessionId}&replayFrom=${replayFrom}&cols=${cols}`;
+    const wsUrl = `${protocol}//${window.location.host}/ws?sessionId=${sessionId}&replayFrom=${replayFrom}`;
     this.logDebug('WS URL: ' + wsUrl);
 
     // Preflight: verify HTTP layer is reachable before opening WS

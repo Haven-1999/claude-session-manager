@@ -5,7 +5,7 @@ import type { Session } from '../session/types';
 import { spawnPty, broadcastToSession, broadcastStatus, waitForClaudeSessionId } from '../session/pty';
 
 interface WsMessage {
-  type: 'input' | 'resize' | 'ping' | 'request_buffer';
+  type: 'input' | 'resize' | 'ping';
   data?: string;
   cols?: number;
   rows?: number;
@@ -47,8 +47,7 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
     const url = new URL(req.url || '/', `http://${req.headers.host}`);
     const sessionId = url.searchParams.get('sessionId');
     const replayFrom = parseReplayFrom(url.searchParams.get('replayFrom'));
-    const clientCols = parseReplayFrom(url.searchParams.get('cols')) || 120;
-    console.log(`[CSM WS] New connection, sessionId=${sessionId}, replayFrom=${replayFrom}, cols=${clientCols}, url=${req.url}`);
+    console.log(`[CSM WS] New connection, sessionId=${sessionId}, replayFrom=${replayFrom}, url=${req.url}`);
     if (!sessionId) {
       console.log('[CSM WS] Reject: missing sessionId');
       ws.close(1008, 'Missing sessionId');
@@ -61,9 +60,6 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
       ws.close(1008, 'Session not found');
       return;
     }
-
-    const colsDiff = session.lastCols ? Math.abs(clientCols - session.lastCols) : 0;
-    const shouldReplay = !session.lastCols || colsDiff <= 20;
 
     let pendingInput: string[] = [];
     let pendingResize: { cols: number; rows: number } | null = null;
@@ -171,12 +167,7 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
     broadcastStatus(session);
     ws.send(JSON.stringify({ type: 'status', status: session.status }));
 
-    if (shouldReplay) {
-      replayBufferedOutput(ws, session, replayFrom);
-    } else {
-      console.log(`[CSM WS] Skipping replay for session ${session.id} due to col mismatch (client=${clientCols}, last=${session.lastCols})`);
-      ws.send(JSON.stringify({ type: 'output', data: '\r\n\x1b[90m[Previous output omitted because terminal width changed]\x1b[0m\r\n' }));
-    }
+    replayBufferedOutput(ws, session, replayFrom);
 
     // Eagerly spawn PTY if not already running so the user sees output immediately
     if (!session.ptyProcess && session.status !== 'stopped') {
@@ -210,8 +201,6 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
           const cols = msg.cols ?? 120;
           const rows = msg.rows ?? 30;
           pendingResize = { cols, rows };
-          session!.lastCols = cols;
-          session!.lastRows = rows;
           if (session!.ptyProcess) {
             session!.ptyProcess.resize(cols, rows);
           } else {
@@ -219,8 +208,6 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
           }
         } else if (msg.type === 'ping') {
           ws.send(JSON.stringify({ type: 'pong' }));
-        } else if (msg.type === 'request_buffer') {
-          replayBufferedOutput(ws, session!, 0);
         }
       } catch {
         // ignore malformed messages
