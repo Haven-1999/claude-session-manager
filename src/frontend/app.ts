@@ -92,7 +92,9 @@ class App {
 
     this.codeEditor = new CodeEditorPanel(document.getElementById('code-editor-content')!);
     this.codeEditor.onClose = () => {
-      document.getElementById('code-editor')!.classList.add('hidden');
+      const editor = document.getElementById('code-editor')!;
+      editor.classList.add('hidden');
+      editor.classList.remove('open');
       this.fitActiveTerminal();
     };
     this.codeEditor.onSave = async (path, content) => {
@@ -132,6 +134,14 @@ class App {
       document.title = this.originalTitle;
     });
     document.addEventListener('paste', (e) => this.handlePaste(e), true);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const editor = document.getElementById('code-editor')!;
+        if (!editor.classList.contains('hidden') && this.codeEditor.onClose) {
+          this.codeEditor.onClose();
+        }
+      }
+    });
 
     // Request notification permission on first user interaction
     const requestNotify = () => {
@@ -154,6 +164,14 @@ class App {
         this.openTauriSettings();
       } else {
         this.showSettingsModal();
+      }
+    });
+    document.getElementById('btn-menu')!.addEventListener('click', () => {
+      const sidebar = document.getElementById('session-list')!;
+      if (sidebar.classList.contains('open')) {
+        this.closeLeftDrawer();
+      } else {
+        this.openLeftDrawer();
       }
     });
 
@@ -255,6 +273,28 @@ class App {
     }
   }
 
+  private isMobile(): boolean {
+    return window.innerWidth < 768;
+  }
+
+  private openLeftDrawer(): void {
+    const sidebar = document.getElementById('session-list')!;
+    sidebar.classList.add('open');
+    if (!document.querySelector('.drawer-backdrop')) {
+      const backdrop = document.createElement('div');
+      backdrop.className = 'drawer-backdrop';
+      backdrop.addEventListener('click', () => this.closeLeftDrawer());
+      document.body.appendChild(backdrop);
+    }
+  }
+
+  private closeLeftDrawer(): void {
+    const sidebar = document.getElementById('session-list')!;
+    sidebar.classList.remove('open');
+    const backdrop = document.querySelector('.drawer-backdrop');
+    if (backdrop) backdrop.remove();
+  }
+
   private async loadSessions(retries = 2): Promise<void> {
     this.logDebug('loadSessions: location=' + window.location.href);
     const start = performance.now();
@@ -336,6 +376,9 @@ class App {
     if (session) this.sessionInfo.render(session);
     this.showSessionTerminal(id);
     this.connect(id);
+    if (this.isMobile()) {
+      this.closeLeftDrawer();
+    }
   }
 
   private showCreateModal(): void {
@@ -844,7 +887,11 @@ class App {
       }
       const data = await res.json();
       await this.codeEditor.open(data.path, data.content);
-      document.getElementById('code-editor')!.classList.remove('hidden');
+      const editor = document.getElementById('code-editor')!;
+      editor.classList.remove('hidden');
+      if (this.isMobile()) {
+        editor.classList.add('open');
+      }
       this.fitActiveTerminal();
     } catch (e) {
       console.error('Open file error:', e);
