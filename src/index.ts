@@ -2,13 +2,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { createServer } from 'net';
 import { createHttpServer } from './server/http-server';
 import { SessionManager } from './server/session/manager';
 import { MemoryService } from './server/memory/service';
 
-function parseArgs(): { port: number; host: string; dataDir: string; claudePath: string; auth?: string } {
+function parseArgs(): { port: number | undefined; host: string; dataDir: string; claudePath: string; auth?: string } {
   const args = process.argv.slice(2);
-  let port = 8080;
+  let port: number | undefined;
   let host = '127.0.0.1';
   let dataDir = path.join(os.homedir(), '.csm');
   let claudePath = 'claude';
@@ -25,7 +26,24 @@ function parseArgs(): { port: number; host: string; dataDir: string; claudePath:
   return { port, host, dataDir, claudePath, auth };
 }
 
-function main(): void {
+function canBind(port: number, host: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const s = createServer();
+    s.once('error', () => resolve(false));
+    s.listen(port, host, () => {
+      s.close(() => resolve(true));
+    });
+  });
+}
+
+async function findAvailablePort(start: number, end: number, host: string): Promise<number> {
+  for (let port = start; port <= end; port += 1) {
+    if (await canBind(port, host)) return port;
+  }
+  throw new Error(`No available port in range ${start}-${end}`);
+}
+
+async function main(): Promise<void> {
   const opts = parseArgs();
 
   if (!fs.existsSync(opts.dataDir)) {
@@ -43,8 +61,10 @@ function main(): void {
     dataDir: opts.dataDir,
   });
 
-  server.listen(opts.port, opts.host, () => {
-    console.log(`CSM listening on http://${opts.host}:${opts.port}`);
+  const port = opts.port ?? await findAvailablePort(9000, 9099, opts.host);
+
+  server.listen(port, opts.host, () => {
+    console.log(`CSM listening on http://${opts.host}:${port}`);
   });
 
   const shutdown = (signal: string) => {
@@ -62,4 +82,7 @@ function main(): void {
   process.on('SIGTERM', () => shutdown('SIGTERM'));
 }
 
-main();
+main().catch((err) => {
+  console.error(err.message);
+  process.exit(1);
+});
