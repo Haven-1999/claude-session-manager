@@ -5,7 +5,7 @@ import type { Session } from '../session/types';
 import { spawnPty, broadcastToSession, broadcastStatus, waitForClaudeSessionId } from '../session/pty';
 
 interface WsMessage {
-  type: 'input' | 'resize' | 'ping';
+  type: 'input' | 'resize' | 'ping' | 'request_buffer';
   data?: string;
   cols?: number;
   rows?: number;
@@ -208,6 +208,8 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
           }
         } else if (msg.type === 'ping') {
           ws.send(JSON.stringify({ type: 'pong' }));
+        } else if (msg.type === 'request_buffer') {
+          replayBufferedOutput(ws, session!, 0);
         }
       } catch {
         // ignore malformed messages
