@@ -6,3 +6,12 @@ public/*.css
 .env
 .DS_Store
 .worktrees/
+
+# macOS temp files
+image/._*
+image/.smbdelete*
+.DS_Store
+
+# Local data
+prompts.db
+.claude/settings.local.json
