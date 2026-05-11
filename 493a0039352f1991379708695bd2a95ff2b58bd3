@@ -1,0 +1,28 @@
+src/frontend/app.ts
+  727022b644213cf3 95-97,137-144,169-176,276-297,379-381,890-894
+src/frontend/index.html
+  727022b644213cf3 21-24
+src/frontend/styles.css
+  727022b644213cf3 85-99,672-729
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.14",
+  "base_commit_sha": "493a0039352f1991379708695bd2a95ff2b58bd3",
+  "prompts": {
+    "727022b644213cf3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ad804e0-de43-48cb-ac44-1897af4a5452",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "konghaiqi <konghaiqi@cvte.com>",
+      "messages": [],
+      "total_additions": 474,
+      "total_deletions": 5,
+      "accepted_lines": 2318,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/f96e7dccdeab19ec95241f4784745ade42bc87ec78fb96f5b6fdf73d45da1f9e"
+    }
+  }
+}
