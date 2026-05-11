@@ -1,0 +1,24 @@
+README.md
+  727022b644213cf3 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.14",
+  "base_commit_sha": "ac06934e3ea4f7d63905f538f3c910f46f453136",
+  "prompts": {
+    "727022b644213cf3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ad804e0-de43-48cb-ac44-1897af4a5452",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "konghaiqi <konghaiqi@cvte.com>",
+      "messages": [],
+      "total_additions": 2189,
+      "total_deletions": 1,
+      "accepted_lines": 2193,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/8103a799d169c4a25cedf1acef1774471b16608956ca48a4e5fe50b4f3ea2e82"
+    }
+  }
+}
