@@ -34,7 +34,7 @@
 - 服务端可选 Basic Auth，通过环境变量或启动参数配置
 - 文件读写 API 对请求路径做 `path.resolve` 规范化，拒绝非绝对路径，防止目录遍历
 - 读取文件时采样前 8KB 内容检测空字节，判定为二进制则拒绝编辑；单文件编辑上限 1MB，上传上限 10MB
-- 直接开放 `9090` 端口适合内网、VPN 或受控服务器环境；公网访问建议配合防火墙白名单、HTTPS、认证或反向代理
+- 内网、VPN 或受控服务器环境可直接开放端口访问；公网访问建议配合防火墙白名单、HTTPS、认证或反向代理
 
 ### 会话生命周期
 - 会话状态分为 `running`（有客户端连接）、`disconnected`（无客户端但 PTY 进程仍在）、`stopped`（PTY 已退出）三种
@@ -52,16 +52,16 @@
 │  - Code editor sidebar (multi-tab)                          │
 └──────────────────────────┬──────────────────────────────────┘
                            │ HTTP / WebSocket
-                           │ http://SERVER_IP:9090
+                           │ http://SERVER_IP:<port>
 ┌──────────────────────────▼──────────────────────────────────┐
 │  Linux Server                                               │
 │  ┌─────────────────────────────────────────────────────┐    │
 │  │ CSM Node.js Backend                                 │    │
 │  │ - Express REST API (/api/sessions, /api/files)      │    │
 │  │ - WebSocket router (input/resize/ping/buffer)       │    │
-│  │ - node-pty spawns `claude` process                   │    │
+│  │ - node-pty spawns `claude` process                  │    │
 │  │ - SQLite persists sessions + output history         │    │
-│  │ - Serves the compiled Web frontend                   │    │
+│  │ - Serves the compiled Web frontend                  │    │
 │  └─────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -72,7 +72,15 @@
 - **Frontend**: Vanilla TypeScript, xterm.js 5.x, xterm-addon-fit, CodeMirror 6 (ESM CDN)
 - **Runtime**: Linux server + browser access from Mac/Windows/Linux
 
-## 服务器端部署
+## 快速开始
+
+选择适合你的部署方式：
+
+| 方式 | 适用场景 | 端口行为 |
+|------|---------|---------|
+| **Linux 直接运行** | 单用户，直接在宿主机部署 | 自动分配 9000-9099，也可指定固定端口 |
+| **Docker 单容器** | 希望隔离环境，一台服务器一个实例 | 固定映射到宿主机 9090 |
+| **Docker + csm-proxy** | 一台服务器多容器/多用户 | 宿主机自动分配 9100-9199，分别代理到各容器 |
 
 ### 方式一：Linux 服务器直接运行
 
@@ -87,17 +95,17 @@ npm install
 # 3. 构建
 npm run build
 
-# 4. 启动（监听所有接口，自动分配端口 9000-9099）
+# 4. 启动（监听所有接口，自动分配可用端口）
 npm start -- --host 0.0.0.0
 ```
 
-启动成功后会输出类似：
+启动成功后会输出实际端口，例如：
 
 ```text
 CSM listening on http://0.0.0.0:9000
 ```
 
-浏览器打开 `http://服务器IP:9000` 即可使用（端口号以实际输出为准）。
+浏览器打开 `http://服务器IP:9000` 即可（端口号以实际输出为准）。
 
 如需指定固定端口：
 
@@ -107,26 +115,25 @@ npm start -- --host 0.0.0.0 --port 9090
 
 > 如果服务器有防火墙，需要放行对应端口。
 
-### 方式二：服务器上运行 Docker
+### 方式二：服务器上运行 Docker（单容器）
 
 ```bash
-# 1. 启动容器
+# 启动容器
 docker run -d \
   --name csm \
   -p 9090:9090 \
   -v csm-data:/root/.csm \
   -v claude-data:/root/.claude \
   haven1999/claude-session-manager:latest
-
-# 2. 浏览器访问
-# http://服务器IP:9090
 ```
+
+浏览器访问 `http://服务器IP:9090`。
 
 > **重要**：必须同时挂载 `csm-data`（CSM 数据库）和 `claude-data`（Claude 会话文件），否则容器重启后会话丢失。
 
-#### 已有容器端口复用（可选）
+### 方式三：Docker 多容器 + csm-proxy（一台服务器多实例）
 
-如果同一台服务器上已有多个 CSM 容器，每个内部都监听 `9090`，可以在宿主机上用 `csm-proxy` 为每个容器分配独立的外部端口：
+当同一台服务器需要运行多个 CSM 容器时，每个容器内部仍监听 `9090`，由 `csm-proxy` 在宿主机分配独立的外部端口：
 
 ```bash
 # 在宿主机上执行
@@ -153,33 +160,29 @@ csm-proxy expose --container csm-bob --port-range 9200-9299
 
 ## Mac 端访问
 
-CSM 不需要在 Mac 上安装客户端。服务在 Linux 服务器启动后，在 Mac 上用 Safari 或 Chrome 打开：
+CSM 不需要在 Mac 上安装客户端。服务在 Linux 服务器启动后，在 Mac 上用 Safari 或 Chrome 打开服务器地址即可。
+
+例如服务器 IP 是 `192.168.1.20`，自动分配的端口是 `9000`：
 
 ```
-http://服务器IP:9090
-```
-
-例如服务器 IP 是 `192.168.1.20`，访问地址就是：
-
-```
-http://192.168.1.20:9090
+http://192.168.1.20:9000
 ```
 
 ### 访问前检查
 
-- Linux 服务器上的 CSM 已使用 `--host 0.0.0.0 --port 9090` 启动
+- Linux 服务器上的 CSM 已启动（输出形如 `CSM listening on http://0.0.0.0:9000`）
 - Mac 和 Linux 服务器网络互通
-- 服务器防火墙已允许可信来源访问 `9090` 端口
+- 服务器防火墙已允许可信来源访问对应端口
 
 ### 安全说明
 
-直接暴露 `9090` 端口适合内网、VPN 或受控服务器环境。如果需要公网访问，建议后续增加 HTTPS、访问控制或反向代理配置。
+直接开放端口适合内网、VPN 或受控服务器环境。如果需要公网访问，建议后续增加 HTTPS、访问控制或反向代理配置。
 
 ## 使用说明
 
 ### 可选：不开放端口时使用 SSH 转发
 
-如果不希望服务器直接开放 `9090` 端口，可以在 Mac 上手动建立 SSH 转发：
+如果不希望服务器直接开放端口，可以在 Mac 上手动建立 SSH 转发：
 
 ```bash
 ssh -N -L 9090:127.0.0.1:9090 user@your-server
