@@ -14,7 +14,7 @@
 - **移动端适配** — 支持手机浏览器访问，窄屏下侧边栏自动收为抽屉，终端区域占满全宽
 - **实时通知** — Claude 回复完成后自动发送浏览器通知
 
-![CSM Mobile Screenshot](image/mobile-screenshot.jpg)
+<img src="image/mobile-screenshot.jpg" alt="CSM Mobile Screenshot" width="320">
 
 ## 设计特点
 
