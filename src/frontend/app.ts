@@ -541,7 +541,8 @@ class App {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const entry = this.terminals.get(sessionId);
     const replayFrom = entry?.receivedChunks ?? 0;
-    const wsUrl = `${protocol}//${window.location.host}/ws?sessionId=${sessionId}&replayFrom=${replayFrom}`;
+    const cols = entry ? (entry.terminal as any).cols ?? 120 : 120;
+    const wsUrl = `${protocol}//${window.location.host}/ws?sessionId=${sessionId}&replayFrom=${replayFrom}&cols=${cols}`;
     this.logDebug('WS URL: ' + wsUrl);
 
     // Preflight: verify HTTP layer is reachable before opening WS

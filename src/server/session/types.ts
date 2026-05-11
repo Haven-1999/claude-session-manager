@@ -15,6 +15,8 @@ export interface Session {
   claudeSessionId?: string | null;
   outputBuffer: string[];
   outputBufferStartIndex: number;
+  lastCols?: number;
+  lastRows?: number;
 }
 
 export interface SessionRecord {
