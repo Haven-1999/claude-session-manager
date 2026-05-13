@@ -158,6 +158,9 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
         return true;
       } catch (err) {
         isSpawning = false;
+        session!.ptyProcess = null;
+        manager.updateStatus(session!.id, 'stopped');
+        broadcastStatus(session!);
         ws.close(1011, 'Failed to spawn PTY');
         return false;
       }
