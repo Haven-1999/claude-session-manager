@@ -159,6 +159,7 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
       } catch (err) {
         isSpawning = false;
         session!.ptyProcess = null;
+        console.error(`[CSM WS] Failed to spawn PTY for session ${session!.id}`, err);
         manager.updateStatus(session!.id, 'stopped');
         broadcastStatus(session!);
         ws.close(1011, 'Failed to spawn PTY');

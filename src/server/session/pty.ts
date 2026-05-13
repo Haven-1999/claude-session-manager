@@ -19,23 +19,29 @@ export function spawnPty(options: PtyOptions): pty.IPty {
   const shell = process.platform === 'win32' ? 'powershell.exe' : claudePath;
   const args = resumeClaudeId ? ['--resume', resumeClaudeId] : [];
   console.log(`[CSM PTY] spawn: ${shell} ${args.join(' ')} in ${cwd} (${cols}x${rows}) resume=${!!resumeClaudeId}`);
+  console.log(`[CSM PTY] env: HOME=${process.env.HOME || ''} PATH=${process.env.PATH || ''} SHELL=${process.env.SHELL || ''}`);
 
-  const proc = pty.spawn(shell, args, {
-    name: 'xterm-256color',
-    cols,
-    rows,
-    cwd,
-    encoding: 'utf8',
-    env: {
-      ...process.env,
-      CLAUDE_CSM_MODE: '1',
-      TERM: 'xterm-256color',
-      LANG: 'en_US.UTF-8',
-      LC_ALL: 'en_US.UTF-8',
-    },
-  });
+  try {
+    const proc = pty.spawn(shell, args, {
+      name: 'xterm-256color',
+      cols,
+      rows,
+      cwd,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        CLAUDE_CSM_MODE: '1',
+        TERM: 'xterm-256color',
+        LANG: 'en_US.UTF-8',
+        LC_ALL: 'en_US.UTF-8',
+      },
+    });
 
-  return proc;
+    return proc;
+  } catch (err) {
+    console.error('[CSM PTY] spawn failed', err);
+    throw err;
+  }
 }
 
 export async function waitForClaudeSessionId(pid: number, timeoutMs = 10000): Promise<string | null> {
