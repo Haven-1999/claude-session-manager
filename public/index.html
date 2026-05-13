@@ -24,6 +24,7 @@
       </div>
       <div class="actions">
         <button id="btn-new">+ New Session</button>
+        <button id="btn-shell" class="btn-secondary" title="Toggle current path terminal">Shell</button>
         <button id="btn-debug">Debug</button>
         <button id="btn-theme" title="Toggle theme">☀</button>
         <button id="btn-settings">Settings</button>
@@ -38,6 +39,14 @@
       </aside>
       <main id="terminal-panel" class="terminal-area">
         <div id="terminal-panels"></div>
+        <section id="shell-panel" class="shell-panel hidden" aria-label="Current path terminal">
+          <div id="shell-resize-handle" class="shell-resize-handle" title="Resize shell terminal"></div>
+          <div class="shell-header">
+            <span id="shell-title">Current Path Shell</span>
+            <button id="shell-collapse" title="Collapse shell terminal">Collapse</button>
+          </div>
+          <div id="shell-terminal" class="shell-terminal"></div>
+        </section>
         <div id="connection-overlay" class="hidden"></div>
         <div id="debug-panel" class="debug-panel"></div>
       </main>

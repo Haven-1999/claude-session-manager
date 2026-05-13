@@ -35,9 +35,15 @@ describe('SessionManager', () => {
     expect(manager.getSession(s.id)!.name).toBe('new');
   });
 
-  it('removes session on close', () => {
-    const s = manager.createSession('temp', '/tmp');
-    manager.closeSession(s.id);
-    expect(manager.getSession(s.id)).toBeUndefined();
+  it('keeps session running while any client remains connected', () => {
+    const s = manager.createSession('proj', '/home/user/proj');
+    const firstClient = {} as any;
+    const secondClient = {} as any;
+
+    manager.attachClient(s.id, firstClient);
+    manager.attachClient(s.id, secondClient);
+    manager.detachClient(s.id, firstClient);
+
+    expect(manager.getSession(s.id)!.status).toBe('running');
   });
 });

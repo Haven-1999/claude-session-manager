@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import { WebSocketServer } from 'ws';
 import type { SessionManager } from './session/manager';
 import { setupWebSocketRouter } from './ws/router';
+import { setupShellWebSocketRouter } from './ws/shell-router';
 import { FileService } from './file/service';
 
 export interface ServerOptions {
@@ -172,8 +173,25 @@ export function createHttpServer(manager: SessionManager, options: Pick<ServerOp
   });
 
   const server = http.createServer(app);
-  const wss = new WebSocketServer({ server, path: '/ws' });
+  const wss = new WebSocketServer({ noServer: true });
+  const shellWss = new WebSocketServer({ noServer: true });
+
+  server.on('upgrade', (req, socket, head) => {
+    const { pathname } = new URL(req.url || '/', `http://${req.headers.host}`);
+    const target = pathname === '/ws' ? wss : pathname === '/shell-ws' ? shellWss : null;
+
+    if (!target) {
+      socket.destroy();
+      return;
+    }
+
+    target.handleUpgrade(req, socket, head, (ws) => {
+      target.emit('connection', ws, req);
+    });
+  });
+
   setupWebSocketRouter(wss, manager, options.claudePath);
+  setupShellWebSocketRouter(shellWss, manager);
 
   return { server, wss };
 }
