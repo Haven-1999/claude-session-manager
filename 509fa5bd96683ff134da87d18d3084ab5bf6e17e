@@ -1,0 +1,44 @@
+tests/frontend/shell-resize.test.ts
+  a6320906e61970ac 1-13
+tests/server/shell-router.test.ts
+  a6320906e61970ac 1-140
+public/index.html
+  a6320906e61970ac 27,42-49
+src/server/ws/shell-router.ts
+  a6320906e61970ac 1-95
+src/server/http-server.ts
+  a6320906e61970ac 8,176-192,194
+src/frontend/app.ts
+  a6320906e61970ac 9,52-60,82-86,135,145,174-175,210-357,359-368,371-384,511-514,577-580,727-730,996-1000,1198-1213,1215-1235,1238,1241,1248,1263,1268,1272-1304,1307
+src/frontend/index.html
+  a6320906e61970ac 27,42-49
+tests/server/session-manager.test.ts
+  a6320906e61970ac 38-47
+tests/server/http-server.test.ts
+  a6320906e61970ac 1-101
+src/frontend/shell-resize.ts
+  a6320906e61970ac 1-4
+src/frontend/styles.css
+  a6320906e61970ac 257-259,283-353
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.14",
+  "base_commit_sha": "509fa5bd96683ff134da87d18d3084ab5bf6e17e",
+  "prompts": {
+    "a6320906e61970ac": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6905a6f1-c7dd-4494-b3a0-a2270d3e3496",
+        "model": "gpt-5.5"
+      },
+      "human_author": "konghaiqi <konghaiqi@cvte.com>",
+      "messages": [],
+      "total_additions": 822,
+      "total_deletions": 91,
+      "accepted_lines": 776,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/5877fa7a964f59090821b070d0c3c7b6528a7595fb5d00b725cfe2b9781c19ca"
+    }
+  }
+}
