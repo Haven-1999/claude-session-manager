@@ -1,6 +1,6 @@
 # Claude Session Manager (CSM)
 
-在 Linux 服务器上运行 Claude Code 会话管理服务，并通过 Safari、Chrome 等浏览器远程访问 Web 界面。
+在 Mac 本地或 Linux 服务器上运行 Claude Code 会话管理服务，并通过 Safari、Chrome 等浏览器访问 Web 界面。
 
 ![CSM Screenshot Light](image/app2.png)
 
@@ -8,10 +8,10 @@
 
 - **多会话管理** — 同时维护多个独立的 Claude Code 会话，每个会话有独立的工作目录和对话上下文
 - **Web 终端** — 基于 xterm.js 的完整终端模拟器，支持彩色输出、文件路径点击跳转
-- **内联代码编辑器** — 点击终端中的文件路径即可在侧边栏打开 CodeMirror 编辑器，直接修改远程文件
-- **会话持久化** — 服务器重启后会话列表自动恢复，支持 `claude --resume` 恢复到之前的对话
-- **浏览器直接访问** — 服务运行在 Linux 服务器，Mac 端只需要 Safari 或 Chrome 打开服务器地址
-- **移动端适配** — 支持手机浏览器访问，窄屏下侧边栏自动收为抽屉，终端区域占满全宽
+- **内联代码编辑器** — 点击终端中的文件路径即可在侧边栏打开 CodeMirror 编辑器，直接修改后端所在机器上的文件
+- **会话持久化** — 后端重启后会话列表自动恢复，支持 `claude --resume` 恢复到之前的对话
+- **本地或远程浏览器访问** — Mac 本地运行时访问 `127.0.0.1`，Linux 服务器运行时访问服务器地址
+- **移动端适配** — 支持手机浏览器访问 Linux 服务器上的 CSM，窄屏下侧边栏自动收为抽屉，终端区域占满全宽
 - **实时通知** — Claude 回复完成后自动发送浏览器通知
 
 <img src="image/mobile-screenshot.jpg" alt="CSM Mobile Screenshot" width="320">
@@ -46,23 +46,26 @@
 
 ## 架构
 
+CSM 的后端运行在哪台机器上，就管理哪台机器上的 shell、文件和 Claude Code 会话：
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  Mac / Linux / Windows Browser                              │
+│  Browser                                                     │
 │  Safari / Chrome / Edge                                     │
 │  - Session list sidebar                                     │
 │  - Terminal panels (WebSocket → PTY)                        │
 │  - Code editor sidebar (multi-tab)                          │
 └──────────────────────────┬──────────────────────────────────┘
                            │ HTTP / WebSocket
-                           │ http://SERVER_IP:<port>
+                           │ Mac local: http://127.0.0.1:<port>
+                           │ Linux server: http://SERVER_IP:<port>
 ┌──────────────────────────▼──────────────────────────────────┐
-│  Linux Server                                               │
+│  Mac 本机或 Linux 服务器                                    │
 │  ┌─────────────────────────────────────────────────────┐    │
 │  │ CSM Node.js Backend                                 │    │
 │  │ - Express REST API (/api/sessions, /api/files)      │    │
 │  │ - WebSocket router (input/resize/ping/buffer)       │    │
-│  │ - node-pty spawns `claude` process                  │    │
+│  │ - node-pty spawns local `claude` process            │    │
 │  │ - SQLite persists sessions + output history         │    │
 │  │ - Serves the compiled Web frontend                  │    │
 │  └─────────────────────────────────────────────────────┘    │
@@ -73,19 +76,57 @@
 
 - **Backend**: Node.js 20+, TypeScript, Express, ws (WebSocket), node-pty, better-sqlite3
 - **Frontend**: Vanilla TypeScript, xterm.js 5.x, xterm-addon-fit, CodeMirror 6 (ESM CDN)
-- **Runtime**: Linux server + browser access from Mac/Windows/Linux
+- **Runtime**: Mac 本地浏览器访问，或 Linux server + browser access from Mac/Windows/Linux
 
 ## 快速开始
 
-选择适合你的部署方式：
+选择适合你的运行方式：
 
 | 方式 | 适用场景 | 端口行为 |
 |------|---------|---------|
-| **Linux 直接运行** | 单用户，直接在宿主机部署 | 自动分配 9000-9099，也可指定固定端口 |
+| **Mac 本地运行** | 在 Mac 上管理本机目录和本机 Claude 会话 | 默认监听 `127.0.0.1`，自动分配 9000-9099 |
+| **Linux 直接运行** | 在服务器上管理服务器目录和 Claude 会话 | 自动分配 9000-9099，也可指定固定端口 |
 | **Docker 单容器** | 希望隔离环境，一台服务器一个实例 | 固定映射到宿主机 9090 |
 | **Docker + csm-proxy** | 一台服务器多容器/多用户 | 宿主机自动分配 9100-9199，分别代理到各容器 |
 
-### 方式一：Linux 服务器直接运行
+### 方式一：Mac 本地运行
+
+前置条件：
+
+- 已安装 Node.js 20+
+- 已安装并登录 Claude Code CLI，终端里可以运行 `claude`
+- 如 `npm install` 编译原生依赖失败，先安装 Xcode Command Line Tools 后重试
+
+```bash
+# 1. 克隆仓库
+git clone https://github.com/Haven-1999/claude-session-manager.git
+cd claude-session-manager
+
+# 2. 安装依赖
+npm install
+
+# 3. 构建
+npm run build
+
+# 4. 启动（默认只监听本机 127.0.0.1）
+npm start
+```
+
+启动成功后会输出实际端口，例如：
+
+```text
+CSM listening on http://127.0.0.1:9000
+```
+
+浏览器打开输出中的地址即可。Mac 本地运行时，CSM 管理的是 Mac 本机文件、本机 shell 和本机 Claude Code 会话。
+
+如果 `claude` 不在 PATH 中，可以指定 Claude CLI 路径：
+
+```bash
+npm start -- --claude-path /path/to/claude
+```
+
+### 方式二：Linux 服务器直接运行
 
 ```bash
 # 1. 克隆仓库
@@ -108,7 +149,7 @@ npm start -- --host 0.0.0.0
 CSM listening on http://0.0.0.0:9000
 ```
 
-浏览器打开 `http://服务器IP:9000` 即可（端口号以实际输出为准）。
+浏览器打开 `http://服务器IP:9000` 即可（端口号以实际输出为准）。Linux 服务器运行时，CSM 管理的是服务器上的文件、shell 和 Claude Code 会话。
 
 如需指定固定端口：
 
@@ -118,7 +159,7 @@ npm start -- --host 0.0.0.0 --port 9090
 
 > 如果服务器有防火墙，需要放行对应端口。
 
-### 方式二：服务器上运行 Docker（单容器）
+### 方式三：服务器上运行 Docker（单容器）
 
 ```bash
 # 启动容器
@@ -134,7 +175,7 @@ docker run -d \
 
 > **重要**：必须同时挂载 `csm-data`（CSM 数据库）和 `claude-data`（Claude 会话文件），否则容器重启后会话丢失。
 
-### 方式三：Docker 多容器 + csm-proxy（一台服务器多实例）
+### 方式四：Docker 多容器 + csm-proxy（一台服务器多实例）
 
 当同一台服务器需要运行多个 CSM 容器时，每个容器内部仍监听 `9090`，由 `csm-proxy` 在宿主机分配独立的外部端口：
 
@@ -161,27 +202,35 @@ Open: http://SERVER_IP:9137
 csm-proxy expose --container csm-bob --port-range 9200-9299
 ```
 
-## Mac 端访问
+## 访问方式说明
 
-CSM 不需要在 Mac 上安装客户端。服务在 Linux 服务器启动后，在 Mac 上用 Safari 或 Chrome 打开服务器地址即可。
+### Mac 本地访问
+
+如果 CSM 后端是在 Mac 本机通过 `npm start` 启动的，浏览器打开启动日志里输出的 `127.0.0.1` 地址即可，例如：
+
+```text
+http://127.0.0.1:9000
+```
+
+这种模式下，会话、文件编辑、shell 命令和 Claude Code 都运行在 Mac 本机，不会连接 Linux 服务器。
+
+### Mac 访问 Linux 服务器
+
+如果 CSM 后端是在 Linux 服务器上启动的，Mac 只作为浏览器客户端访问服务器地址。
 
 例如服务器 IP 是 `192.168.1.20`，自动分配的端口是 `9000`：
 
-```
+```text
 http://192.168.1.20:9000
 ```
 
-### 访问前检查
+访问前检查：
 
 - Linux 服务器上的 CSM 已启动（输出形如 `CSM listening on http://0.0.0.0:9000`）
 - Mac 和 Linux 服务器网络互通
 - 服务器防火墙已允许可信来源访问对应端口
 
-### 安全说明
-
 直接开放端口适合内网、VPN 或受控服务器环境。如果需要公网访问，建议后续增加 HTTPS、访问控制或反向代理配置。
-
-## 使用说明
 
 ### 可选：不开放端口时使用 SSH 转发
 
@@ -193,11 +242,13 @@ ssh -N -L 9090:127.0.0.1:9090 user@your-server
 
 然后浏览器打开：
 
-```
+```text
 http://127.0.0.1:9090
 ```
 
-这是可选方式，不是默认部署路径。
+这是 Linux 服务器访问路径的可选方式，不是 Mac 本地运行路径。
+
+## 使用说明
 
 ### 创建会话
 
