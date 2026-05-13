@@ -254,6 +254,9 @@ html, body, #app {
 #terminal-panels {
   flex: 1;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .terminal-panel {
@@ -269,6 +272,85 @@ html, body, #app {
 }
 
 .terminal-panel .xterm {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  overflow: hidden;
+  font-variant-ligatures: none;
+}
+
+.shell-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 260px;
+  min-height: 140px;
+  max-height: 420px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
+  position: relative;
+}
+
+.shell-panel.hidden {
+  display: none;
+}
+
+.shell-resize-handle {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -4px;
+  height: 8px;
+  cursor: row-resize;
+  background: transparent;
+  z-index: 10;
+}
+
+.shell-resize-handle:hover,
+.shell-resize-handle.dragging {
+  background: var(--accent);
+}
+
+.shell-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--fg-primary);
+  background: var(--bg-secondary);
+}
+
+#shell-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell-header button {
+  background: var(--bg-tertiary);
+  color: var(--fg-primary);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.shell-header button:hover {
+  background: var(--bg-hover);
+}
+
+.shell-terminal {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 12px 12px;
+}
+
+.shell-terminal .xterm {
   width: 100%;
   height: 100%;
   border-radius: var(--radius);

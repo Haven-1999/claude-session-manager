@@ -6,6 +6,7 @@ import { SessionInfo } from './components/session-info.js';
 import { CodeEditorPanel } from './components/code-editor.js';
 import { FileLinkProvider } from './components/file-link-provider.js';
 import { Settings } from './settings.js';
+import { shellPanelHeightForDrag } from './shell-resize.js';
 
 function showAlert(message: string): void {
   const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
@@ -48,6 +49,15 @@ interface TerminalEntry {
   receivedChunks: number;
 }
 
+interface ShellTerminalEntry {
+  terminal: Terminal;
+  fitAddon: FitAddon;
+  container: HTMLElement;
+  ws: WebSocket | null;
+  isOpen: boolean;
+  isReady: boolean;
+}
+
 class App {
   private ws: WebSocket | null = null;
   private terminals = new Map<string, TerminalEntry>();
@@ -69,6 +79,11 @@ class App {
   private debugEl: HTMLElement;
   private debugLines: string[] = [];
   private settings: Settings;
+  private shellTerminal: ShellTerminalEntry | null = null;
+  private shellSessionId: string | null = null;
+  private shellVisible = false;
+  private shellConnecting = false;
+  private shellReconnectTimer: number | null = null;
 
   constructor() {
     this.settings = new Settings();
@@ -117,6 +132,7 @@ class App {
     };
 
     this.setupEditorResize();
+    this.setupShellResize();
 
     // Apply initial settings after all components are initialized
     this.applySettings(this.settings.data);
@@ -126,6 +142,7 @@ class App {
       this.resizeDebounceTimer = window.setTimeout(() => {
         this.resizeDebounceTimer = null;
         this.fitActiveTerminal();
+        this.fitShellTerminal();
       }, 150);
     });
     window.addEventListener('blur', () => { this.windowFocused = false; });
@@ -154,6 +171,8 @@ class App {
 
     document.getElementById('btn-new')!.addEventListener('click', () => this.showCreateModal());
     document.getElementById('btn-debug')!.addEventListener('click', () => this.toggleDebugPanel());
+    document.getElementById('btn-shell')!.addEventListener('click', () => this.toggleShellPanel());
+    document.getElementById('shell-collapse')!.addEventListener('click', () => this.hideShellPanel());
 
     document.getElementById('btn-theme')!.addEventListener('click', () => {
       const next = this.settings.data.theme === 'dark' ? 'light' : 'dark';
@@ -186,6 +205,181 @@ class App {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
+  }
+
+  private getShellTerminal(): ShellTerminalEntry {
+    if (!this.shellTerminal) {
+      this.shellTerminal = this.createShellTerminal();
+    }
+    return this.shellTerminal;
+  }
+
+  private createShellTerminal(): ShellTerminalEntry {
+    const container = document.getElementById('shell-terminal')!;
+    const terminal = new Terminal({
+      cursorBlink: true,
+      fontSize: this.settings.data.terminalFontSize,
+      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      minimumContrastRatio: 4.5,
+      allowProposedApi: true,
+      convertEol: true,
+      screenReaderMode: false,
+      unicodeVersion: '11',
+      theme: this.settings.data.theme === 'dark' ? oneDarkTheme : oneLightTheme,
+      bellStyle: 'visual',
+    });
+    const fitAddon = new FitAddon();
+    terminal.loadAddon(fitAddon);
+    container.style.display = 'block';
+    terminal.open(container);
+    const entry: ShellTerminalEntry = {
+      terminal,
+      fitAddon,
+      container,
+      ws: null,
+      isOpen: false,
+      isReady: false,
+    };
+    terminal.onData((data) => {
+      if (entry.ws?.readyState === WebSocket.OPEN && this.shellVisible && entry.isReady) {
+        entry.ws.send(JSON.stringify({ type: 'input', data }));
+      }
+    });
+    return entry;
+  }
+
+  private showShellPanel(): void {
+    const panel = document.getElementById('shell-panel')!;
+    panel.classList.remove('hidden');
+    const shellTerminal = this.getShellTerminal();
+    this.shellVisible = true;
+    shellTerminal.isOpen = true;
+    this.updateShellTitle();
+    this.fitShellTerminal();
+    this.connectShell();
+  }
+
+  private hideShellPanel(): void {
+    const panel = document.getElementById('shell-panel')!;
+    panel.classList.add('hidden');
+    this.shellVisible = false;
+    if (this.shellTerminal) {
+      this.shellTerminal.isOpen = false;
+    }
+    this.disconnectShell();
+  }
+
+  private toggleShellPanel(): void {
+    if (this.shellVisible) {
+      this.hideShellPanel();
+    } else {
+      this.showShellPanel();
+    }
+  }
+
+  private updateShellTitle(): void {
+    const title = document.getElementById('shell-title')!;
+    const session = this.sessions.find((s) => s.id === this.activeSessionId);
+    title.textContent = session ? `Current Path Shell · ${session.cwd}` : 'Current Path Shell';
+  }
+
+  private connectShell(): void {
+    if (!this.shellVisible || !this.activeSessionId) return;
+    const shellTerminal = this.getShellTerminal();
+    if (this.shellConnecting) return;
+    if (this.shellSessionId === this.activeSessionId && shellTerminal.ws?.readyState === WebSocket.OPEN) return;
+
+    this.disconnectShell();
+    this.shellSessionId = this.activeSessionId;
+    this.shellConnecting = true;
+    shellTerminal.isReady = false;
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const url = `${protocol}//${window.location.host}/shell-ws?sessionId=${this.activeSessionId}`;
+    const ws = new WebSocket(url);
+    shellTerminal.ws = ws;
+
+    ws.onopen = () => {
+      if (shellTerminal.ws !== ws) return;
+      this.shellConnecting = false;
+      shellTerminal.isReady = true;
+      this.fitShellTerminal();
+      (shellTerminal.terminal as any).focus();
+      this.sendShellResize();
+    };
+
+    ws.onmessage = (event) => {
+      if (shellTerminal.ws !== ws) return;
+      const raw = typeof event.data === 'string' ? event.data : '';
+      try {
+        const msg = JSON.parse(raw);
+        if (msg.type === 'output') {
+          shellTerminal.terminal.write(msg.data);
+        } else if (msg.type === 'pong') {
+          // noop
+        }
+      } catch {
+        // Ignore malformed shell messages.
+      }
+    };
+
+    ws.onclose = () => {
+      if (shellTerminal.ws !== ws) return;
+      shellTerminal.ws = null;
+      shellTerminal.isReady = false;
+      this.shellConnecting = false;
+      if (this.shellVisible && this.activeSessionId === this.shellSessionId) {
+        this.scheduleShellReconnect();
+      }
+    };
+
+    ws.onerror = () => {
+      ws.close();
+    };
+  }
+
+  private disconnectShell(): void {
+    if (this.shellReconnectTimer) {
+      clearTimeout(this.shellReconnectTimer);
+      this.shellReconnectTimer = null;
+    }
+    this.shellConnecting = false;
+    if (this.shellTerminal) {
+      this.shellTerminal.isReady = false;
+      if (this.shellTerminal.ws) {
+        const ws = this.shellTerminal.ws;
+        ws.onopen = null;
+        ws.onmessage = null;
+        ws.onclose = null;
+        ws.onerror = null;
+        ws.close();
+        this.shellTerminal.ws = null;
+      }
+    }
+  }
+
+  private scheduleShellReconnect(): void {
+    if (this.shellReconnectTimer) return;
+    this.shellReconnectTimer = window.setTimeout(() => {
+      this.shellReconnectTimer = null;
+      if (this.shellVisible && this.activeSessionId === this.shellSessionId) {
+        this.connectShell();
+      }
+    }, 1000);
+  }
+
+  private fitShellTerminal(): void {
+    if (!this.shellVisible || !this.shellTerminal) return;
+    this.shellTerminal.fitAddon.fit();
+    this.sendShellResize();
+  }
+
+  private sendShellResize(): void {
+    if (!this.shellTerminal?.ws || this.shellTerminal.ws.readyState !== WebSocket.OPEN || !this.shellVisible) return;
+    const dims = this.shellTerminal.fitAddon.proposeDimensions();
+    const cols = dims?.cols ?? 120;
+    const rows = dims?.rows ?? 30;
+    this.shellTerminal.ws.send(JSON.stringify({ type: 'resize', cols, rows }));
   }
 
   private createTerminal(sessionId: string): TerminalEntry {
@@ -314,6 +508,10 @@ class App {
       this.sessions = await res.json();
       this.logDebug('Loaded ' + this.sessions.length + ' sessions in ' + elapsed + 'ms');
       this.sessionList.render(this.sessions, this.activeSessionId);
+      if (this.shellVisible) {
+        this.updateShellTitle();
+      }
+
       if (this.sessions.length > 0 && !this.activeSessionId) {
         this.logDebug('Auto-switch to first session');
         this.switchSession(this.sessions[0].id);
@@ -376,6 +574,10 @@ class App {
     if (session) this.sessionInfo.render(session);
     this.showSessionTerminal(id);
     this.connect(id);
+    this.updateShellTitle();
+    if (this.shellVisible) {
+      this.connectShell();
+    }
     if (this.isMobile()) {
       this.closeLeftDrawer();
     }
@@ -520,6 +722,10 @@ class App {
     this.logDebug('connect() called for ' + sessionId + ', active=' + this.activeSessionId);
     if (this.activeSessionId !== sessionId) {
       this.logDebug('connect() aborted: activeSessionId mismatch');
+      return;
+    }
+    if (this.ws && this.ws.readyState !== WebSocket.CLOSED) {
+      this.logDebug('connect() skipped: existing WebSocket is still active');
       return;
     }
     this.logDebug('location=' + window.location.href + ' proto=' + window.location.protocol + ' host=' + window.location.host);
@@ -787,6 +993,12 @@ class App {
       requestAnimationFrame(() => entry.fitAddon.fit());
     }
 
+    if (this.shellTerminal) {
+      (this.shellTerminal.terminal as any).options.fontSize = data.terminalFontSize;
+      (this.shellTerminal.terminal as any).options.theme = xtermTheme;
+      requestAnimationFrame(() => this.fitShellTerminal());
+    }
+
     if (this.codeEditor) {
       this.codeEditor.setTheme(isDark).catch(console.error);
     }
@@ -983,17 +1195,57 @@ class App {
     });
   }
 
-  private async handlePaste(e: ClipboardEvent): Promise<void> {
+  private setupShellResize(): void {
+    const handle = document.getElementById('shell-resize-handle')!;
+    const panel = document.getElementById('shell-panel')!;
+    let isDragging = false;
+    let startY = 0;
+    let startHeight = 0;
+
+    handle.addEventListener('mousedown', (e) => {
+      if (this.shellVisible) {
+        isDragging = true;
+        startY = e.clientY;
+        startHeight = panel.offsetHeight;
+        handle.classList.add('dragging');
+        document.body.style.cursor = 'row-resize';
+        document.body.style.userSelect = 'none';
+      }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const newHeight = shellPanelHeightForDrag(startHeight, startY, e.clientY);
+      panel.style.flexBasis = `${newHeight}px`;
+      this.fitShellTerminal();
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (!isDragging) return;
+      isDragging = false;
+      handle.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      this.fitShellTerminal();
+    });
+  }
+
+  private handleShellSessionChange(): void {
+    if (!this.shellVisible || !this.activeSessionId) return;
+    this.connectShell();
+  }
+
+  private handlePaste(e: ClipboardEvent): Promise<void> {
     if (!e.clipboardData) {
       this.logDebug('Paste: no clipboardData');
-      return;
+      return Promise.resolve();
     }
 
     // Use items API for better compatibility across browsers
     const items = e.clipboardData.items;
     if (!items || items.length === 0) {
       this.logDebug('Paste: no clipboard items');
-      return;
+      return Promise.resolve();
     }
 
     const files: File[] = [];
@@ -1008,49 +1260,51 @@ class App {
 
     if (files.length === 0) {
       this.logDebug('Paste: no image files found');
-      return;
+      return Promise.resolve();
     }
 
     // Skip if focus is inside CodeMirror editor
     const target = e.target as HTMLElement;
-    if (target?.closest('.cm-editor')) return;
+    if (target?.closest('.cm-editor')) return Promise.resolve();
 
     e.preventDefault();
 
-    for (const file of files) {
-      this.logDebug(`Pasting image: ${file.name} (${file.size} bytes)`);
-      try {
-        const base64 = await readFileAsBase64(file);
-        const res = await fetch('/api/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId: this.activeSessionId,
-            filename: file.name,
-            data: base64,
-          }),
-        });
-        if (!res.ok) {
-          const text = await res.text().catch(() => 'no body');
-          this.logDebug(`Upload failed: HTTP ${res.status} body=${text.slice(0, 200)}`);
-          let errMsg = res.statusText;
-          try { errMsg = JSON.parse(text).error || errMsg; } catch {}
-          showAlert('Failed to upload image: ' + errMsg);
-          continue;
-        }
-        const result = await res.json();
-        this.logDebug(`Image uploaded to: ${result.path}`);
+    return (async () => {
+      for (const file of files) {
+        this.logDebug(`Pasting image: ${file.name} (${file.size} bytes)`);
+        try {
+          const base64 = await readFileAsBase64(file);
+          const res = await fetch('/api/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionId: this.activeSessionId,
+              filename: file.name,
+              data: base64,
+            }),
+          });
+          if (!res.ok) {
+            const text = await res.text().catch(() => 'no body');
+            this.logDebug(`Upload failed: HTTP ${res.status} body=${text.slice(0, 200)}`);
+            let errMsg = res.statusText;
+            try { errMsg = JSON.parse(text).error || errMsg; } catch {}
+            showAlert('Failed to upload image: ' + errMsg);
+            continue;
+          }
+          const result = await res.json();
+          this.logDebug(`Image uploaded to: ${result.path}`);
 
-        if (this.ws?.readyState === WebSocket.OPEN && this.activeSessionId) {
-          const displayPath = result.path.startsWith('/root/')
-            ? result.path.replace(/^\/root\//, '~/')
-            : result.path;
-          this.ws.send(JSON.stringify({ type: 'input', data: displayPath }));
+          if (this.ws?.readyState === WebSocket.OPEN && this.activeSessionId) {
+            const displayPath = result.path.startsWith('/root/')
+              ? result.path.replace(/^\/root\//, '~/')
+              : result.path;
+            this.ws.send(JSON.stringify({ type: 'input', data: displayPath }));
+          }
+        } catch (err) {
+          showAlert('Error uploading image: ' + (err as Error).message);
         }
-      } catch (err) {
-        showAlert('Error uploading image: ' + (err as Error).message);
       }
-    }
+    })();
   }
 
   private toggleDebugPanel(): void {
