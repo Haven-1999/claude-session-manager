@@ -1,0 +1,24 @@
+docs/superpowers/specs/2026-05-13-mac-local-browser-runtime-design.md
+  1f9b929521a41be3 1-84
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.14",
+  "base_commit_sha": "216c2a9c66eee71c7b30a31c0f895d659d312b88",
+  "prompts": {
+    "1f9b929521a41be3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "730795cd-1b1c-41d5-ba66-bed6d11f5f6a",
+        "model": "gpt-5.5"
+      },
+      "human_author": "konghaiqi <konghaiqi@cvte.com>",
+      "messages": [],
+      "total_additions": 84,
+      "total_deletions": 0,
+      "accepted_lines": 84,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/5ba6974135ac2c338645144d1697d62e0fc29742a6c9b05146c4afdced200e63"
+    }
+  }
+}
