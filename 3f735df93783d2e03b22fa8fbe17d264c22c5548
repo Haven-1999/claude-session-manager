@@ -1,0 +1,26 @@
+tests/server/shell-router.test.ts
+  1f9b929521a41be3 1,4,62-84,93,98,105-107,126-127,130-131,139-140
+src/server/ws/shell-router.ts
+  1f9b929521a41be3 14,16-21,42-43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.14",
+  "base_commit_sha": "3f735df93783d2e03b22fa8fbe17d264c22c5548",
+  "prompts": {
+    "1f9b929521a41be3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "730795cd-1b1c-41d5-ba66-bed6d11f5f6a",
+        "model": "gpt-5.5"
+      },
+      "human_author": "konghaiqi <konghaiqi@cvte.com>",
+      "messages": [],
+      "total_additions": 73,
+      "total_deletions": 39,
+      "accepted_lines": 3478,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/0a5535ba18eecbde452aea26f158d28effb28d7324282827cdc71e56426a9e78"
+    }
+  }
+}
