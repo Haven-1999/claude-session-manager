@@ -17,7 +17,9 @@
     "tunnel": "node scripts/tunnel.js",
     "tunnel:daemon": "node scripts/tunnel.js daemon",
     "tunnel:stop": "node scripts/tunnel.js stop",
-    "tunnel:status": "node scripts/tunnel.js status"
+    "tunnel:status": "node scripts/tunnel.js status",
+    "postinstall": "node scripts/postinstall.js",
+    "setup": "npm install && npm run build"
   },
   "dependencies": {
     "better-sqlite3": "^12.9.0",
