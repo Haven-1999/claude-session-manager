@@ -144,9 +144,8 @@ class ScriptPtyHandle extends EventEmitter implements PtyHandle {
     this.proc.stdin?.write(data);
   }
 
-  resize(_cols: number, _rows: number): void {
-    // script-based fallback has limited resize support
-    // SIGWINCH doesn't propagate through script on all macOS versions
+  resize(cols: number, rows: number): void {
+    this.proc.stdin?.write(`\x1b]9999;${cols}x${rows}\x07`);
   }
 
   kill(signal?: string): void {

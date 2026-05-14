@@ -4,6 +4,9 @@ Used as a fallback when node-pty doesn't work (e.g. macOS 26+)."""
 
 import sys, os, pty, select, signal, struct, fcntl, termios, errno
 
+RESIZE_PREFIX = b'\x1b]9999;'
+RESIZE_SUFFIX = b'\x07'
+
 def set_winsize(fd, rows, cols):
     try:
         s = struct.pack('HHHH', rows, cols, 0, 0)
@@ -47,15 +50,7 @@ def main():
     flags = fcntl.fcntl(stdin_fd, fcntl.F_GETFL)
     fcntl.fcntl(stdin_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
 
-    # Handle SIGWINCH to resize PTY
-    def on_winch(signum, frame):
-        try:
-            new_cols = int(os.environ.get('COLUMNS', '120'))
-            new_rows = int(os.environ.get('LINES', '30'))
-            set_winsize(master_fd, new_rows, new_cols)
-        except:
-            pass
-    signal.signal(signal.SIGWINCH, on_winch)
+    signal.signal(signal.SIGWINCH, signal.SIG_IGN)
 
     # Forward SIGINT/SIGTERM to child
     def forward_signal(signum, frame):
@@ -68,6 +63,7 @@ def main():
 
     stdout_fd = sys.stdout.fileno()
     exit_code = 0
+    stdin_buffer = b''
 
     try:
         while True:
@@ -90,10 +86,41 @@ def main():
 
             if stdin_fd in r:
                 try:
-                    data = os.read(stdin_fd, 65536)
-                    if not data:
+                    chunk = os.read(stdin_fd, 65536)
+                    if not chunk:
                         break
-                    os.write(master_fd, data)
+                    stdin_buffer += chunk
+                    # Process all complete resize sequences
+                    while True:
+                        start = stdin_buffer.find(RESIZE_PREFIX)
+                        if start == -1:
+                            # No resize prefix; forward entire buffer
+                            if stdin_buffer:
+                                os.write(master_fd, stdin_buffer)
+                                stdin_buffer = b''
+                            break
+                        end = stdin_buffer.find(RESIZE_SUFFIX, start + len(RESIZE_PREFIX))
+                        if end == -1:
+                            # Incomplete sequence; forward bytes before it, keep the rest
+                            if start > 0:
+                                os.write(master_fd, stdin_buffer[:start])
+                                stdin_buffer = stdin_buffer[start:]
+                            break
+                        # Forward any bytes before the sequence
+                        if start > 0:
+                            os.write(master_fd, stdin_buffer[:start])
+                        # Extract payload before removing from buffer
+                        payload = stdin_buffer[start + len(RESIZE_PREFIX):end]
+                        stdin_buffer = stdin_buffer[end + len(RESIZE_SUFFIX):]
+                        # Parse and apply resize
+                        try:
+                            dims = payload.decode('ascii')
+                            c, r_val = dims.split('x')
+                            new_cols, new_rows = int(c), int(r_val)
+                            set_winsize(master_fd, new_rows, new_cols)
+                            os.kill(pid, signal.SIGWINCH)
+                        except (ValueError, OSError):
+                            pass
                 except OSError as e:
                     if e.errno == errno.EAGAIN:
                         continue

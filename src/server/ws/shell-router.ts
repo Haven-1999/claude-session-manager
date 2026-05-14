@@ -89,7 +89,7 @@ function spawnShellProcess(shell: string, args: string[], cwd: string, cols: num
     },
     onExit: (cb) => cp.on('exit', (code) => cb({ exitCode: code ?? 1 })),
     write: (data) => cp.stdin?.write(data),
-    resize: () => {},
+    resize: (cols, rows) => { cp.stdin?.write(`\x1b]9999;${cols}x${rows}\x07`); },
     kill: (signal?: string) => cp.kill(signal as NodeJS.Signals || 'SIGTERM'),
     pid: cp.pid!,
   };
