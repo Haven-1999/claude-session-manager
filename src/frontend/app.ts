@@ -2,6 +2,7 @@ import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import { oneDarkTheme, oneLightTheme } from './xterm-themes.js';
 import { SessionList } from './components/session-list.js';
+import type { TagSummary } from './components/session-list.js';
 import { SessionInfo } from './components/session-info.js';
 import { CodeEditorPanel } from './components/code-editor.js';
 import { FileLinkProvider } from './components/file-link-provider.js';
@@ -39,6 +40,7 @@ interface SessionSummary {
   status: 'running' | 'disconnected' | 'stopped';
   createdAt: number;
   lastActiveAt: number;
+  tagId: string;
 }
 
 interface TerminalEntry {
@@ -63,6 +65,7 @@ class App {
   private terminals = new Map<string, TerminalEntry>();
   private activeSessionId: string | null = null;
   private sessions: SessionSummary[] = [];
+  private tags: TagSummary[] = [];
   private reconnectTimer: number | null = null;
   private reconnectDelay = 1000;
   private sessionList: SessionList;
@@ -101,6 +104,10 @@ class App {
       onNew: () => this.showCreateModal(),
       onDelete: (id) => this.deleteSession(id),
       onRename: (id, name) => this.renameSession(id, name),
+      onMoveSession: (sessionId, tagId) => this.moveSession(sessionId, tagId),
+      onCreateTag: (name) => this.createTag(name),
+      onRenameTag: (id, name) => this.renameTag(id, name),
+      onDeleteTag: (id, action) => this.deleteTag(id, action),
     });
 
     this.sessionInfo = new SessionInfo(document.getElementById('session-info-content')!);
@@ -501,13 +508,20 @@ class App {
       const elapsed = Math.round(performance.now() - start);
       if (!res.ok) {
         this.logDebug('fetch /api/sessions HTTP ' + res.status + ' after ' + elapsed + 'ms');
-        this.sessionList.render([], null);
+        this.sessionList.render([], [], null);
         this.sessionInfo.render(null);
         return;
       }
       this.sessions = await res.json();
+      // Load tags
+      try {
+        const tagsRes = await fetch('/api/tags');
+        if (tagsRes.ok) {
+          this.tags = await tagsRes.json();
+        }
+      } catch {}
       this.logDebug('Loaded ' + this.sessions.length + ' sessions in ' + elapsed + 'ms');
-      this.sessionList.render(this.sessions, this.activeSessionId);
+      this.sessionList.render(this.sessions, this.tags, this.activeSessionId);
       if (this.shellVisible) {
         this.updateShellTitle();
       }
@@ -530,7 +544,7 @@ class App {
         setTimeout(() => this.loadSessions(retries - 1), 1000);
         return;
       }
-      this.sessionList.render([], null);
+      this.sessionList.render([], [], null);
       this.sessionInfo.render(null);
       if (isTimeout) {
         this.showOverlay('Connection timed out. SSH tunnel may be unstable. Click Settings to reconnect.');
@@ -569,7 +583,7 @@ class App {
     if (this.activeSessionId === id) return;
     this.disconnect();
     this.activeSessionId = id;
-    this.sessionList.render(this.sessions, id);
+    this.sessionList.render(this.sessions, this.tags, id);
     const session = this.sessions.find((s) => s.id === id);
     if (session) this.sessionInfo.render(session);
     this.showSessionTerminal(id);
@@ -587,6 +601,11 @@ class App {
     const existing = document.querySelector('.modal-overlay');
     if (existing) existing.remove();
 
+    const tagOptions = this.tags.map(t =>
+      `<option value="${t.id}"${t.id === 'uncategorized' ? '' : ''}>${this.escapeHtml(t.name)}</option>`
+    ).join('');
+    const defaultTag = this.tags.find(t => t.id !== 'uncategorized')?.id || 'uncategorized';
+
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.innerHTML = `
@@ -599,6 +618,11 @@ class App {
         <div class="field">
           <label>Working Directory</label>
           <input type="text" id="modal-cwd" value="/tmp" placeholder="/tmp">
+          <div id="cwd-completions" class="cwd-completions hidden"></div>
+        </div>
+        <div class="field">
+          <label>Tag</label>
+          <select id="modal-tag" class="modal-select">${tagOptions}</select>
         </div>
         <div class="modal-actions">
           <button class="btn-secondary" id="modal-cancel">Cancel</button>
@@ -611,18 +635,74 @@ class App {
 
     const nameInput = overlay.querySelector('#modal-name') as HTMLInputElement;
     const cwdInput = overlay.querySelector('#modal-cwd') as HTMLInputElement;
+    const tagSelect = overlay.querySelector('#modal-tag') as HTMLSelectElement;
+    const completionsEl = overlay.querySelector('#cwd-completions') as HTMLElement;
+    tagSelect.value = defaultTag;
     nameInput.focus();
     nameInput.select();
 
-    const close = () => overlay.remove();
+    // Tab completion for cwd
+    let completionTimer: number | null = null;
+    cwdInput.addEventListener('keydown', async (e) => {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const partial = cwdInput.value;
+        if (!partial) return;
+        try {
+          const res = await fetch(`/api/path-completions?partial=${encodeURIComponent(partial)}`);
+          if (!res.ok) return;
+          const dirs: string[] = await res.json();
+          if (dirs.length === 0) return;
+          if (dirs.length === 1) {
+            cwdInput.value = dirs[0] + '/';
+            completionsEl.classList.add('hidden');
+          } else {
+            // Find common prefix
+            let prefix = dirs[0];
+            for (const d of dirs) {
+              while (!d.startsWith(prefix)) {
+                prefix = prefix.slice(0, -1);
+              }
+            }
+            if (prefix.length > partial.length) {
+              cwdInput.value = prefix;
+            }
+            // Show completions
+            completionsEl.innerHTML = dirs.map(d => `<div class="cwd-completion-item">${this.escapeHtml(d)}</div>`).join('');
+            completionsEl.classList.remove('hidden');
+            // Click to select
+            completionsEl.querySelectorAll('.cwd-completion-item').forEach((item, i) => {
+              item.addEventListener('click', () => {
+                cwdInput.value = dirs[i] + '/';
+                completionsEl.classList.add('hidden');
+                cwdInput.focus();
+              });
+            });
+            // Auto-hide after 3s
+            if (completionTimer) clearTimeout(completionTimer);
+            completionTimer = window.setTimeout(() => {
+              completionsEl.classList.add('hidden');
+            }, 3000);
+          }
+        } catch {}
+      } else {
+        completionsEl.classList.add('hidden');
+      }
+    });
+
+    const close = () => {
+      if (completionTimer) clearTimeout(completionTimer);
+      overlay.remove();
+    };
 
     overlay.querySelector('#modal-cancel')!.addEventListener('click', close);
     overlay.querySelector('#modal-create')!.addEventListener('click', async () => {
       const name = nameInput.value.trim();
       const cwd = cwdInput.value.trim();
+      const tagId = tagSelect.value;
       if (!name || !cwd) return;
       close();
-      await this.doCreateSession(name, cwd);
+      await this.doCreateSession(name, cwd, tagId);
     });
 
     overlay.addEventListener('click', (e) => {
@@ -632,20 +712,15 @@ class App {
     nameInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') cwdInput.focus();
     });
-    cwdInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        (overlay.querySelector('#modal-create') as HTMLButtonElement).click();
-      }
-    });
   }
 
-  private async doCreateSession(name: string, cwd: string): Promise<void> {
-    this.logDebug(`Creating session: name=${name}, cwd=${cwd}`);
+  private async doCreateSession(name: string, cwd: string, tagId?: string): Promise<void> {
+    this.logDebug(`Creating session: name=${name}, cwd=${cwd}, tagId=${tagId}`);
     try {
       const res = await fetch('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, cwd }),
+        body: JSON.stringify({ name, cwd, tagId }),
       });
       this.logDebug(`Create session response: ${res.status}`);
       if (!res.ok) {
@@ -657,7 +732,7 @@ class App {
       const session: SessionSummary = await res.json();
       this.logDebug(`Session created: ${session.id}`);
       this.sessions.unshift(session);
-      this.sessionList.render(this.sessions, this.activeSessionId);
+      this.sessionList.render(this.sessions, this.tags, this.activeSessionId);
       this.switchSession(session.id);
     } catch (e) {
       const msg = (e as Error).message;
@@ -677,7 +752,7 @@ class App {
       const s = this.sessions.find((x) => x.id === id);
       if (s) {
         s.name = name;
-        this.sessionList.render(this.sessions, this.activeSessionId);
+        this.sessionList.render(this.sessions, this.tags, this.activeSessionId);
         if (this.activeSessionId === id) {
           this.sessionInfo.render(s);
         }
@@ -707,15 +782,108 @@ class App {
         if (this.sessions.length > 0) {
           this.switchSession(this.sessions[0].id);
         } else {
-          this.sessionList.render([], null);
+          this.sessionList.render([], [], null);
           this.sessionInfo.render(null);
         }
       } else {
-        this.sessionList.render(this.sessions, this.activeSessionId);
+        this.sessionList.render(this.sessions, this.tags, this.activeSessionId);
       }
     } catch (e) {
       console.error('deleteSession error:', e);
     }
+  }
+
+  private async moveSession(sessionId: string, tagId: string): Promise<void> {
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tagId }),
+      });
+      if (!res.ok) return;
+      const s = this.sessions.find(x => x.id === sessionId);
+      if (s) {
+        s.tagId = tagId;
+        this.sessionList.render(this.sessions, this.tags, this.activeSessionId);
+      }
+    } catch (e) {
+      console.error('moveSession error:', e);
+    }
+  }
+
+  private async createTag(name: string): Promise<void> {
+    try {
+      const res = await fetch('/api/tags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+        showAlert('Failed to create tag: ' + (err.error || res.statusText));
+        return;
+      }
+      await this.refreshTags();
+    } catch (e) {
+      console.error('createTag error:', e);
+    }
+  }
+
+  private async renameTag(id: string, name: string): Promise<void> {
+    try {
+      const res = await fetch(`/api/tags/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+        showAlert('Failed to rename tag: ' + (err.error || res.statusText));
+        return;
+      }
+      await this.refreshTags();
+    } catch (e) {
+      console.error('renameTag error:', e);
+    }
+  }
+
+  private async deleteTag(id: string, action: 'move_uncategorized' | 'delete_sessions'): Promise<void> {
+    try {
+      const res = await fetch(`/api/tags/${id}?action=${action}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+        showAlert('Failed to delete tag: ' + (err.error || res.statusText));
+        return;
+      }
+      if (action === 'delete_sessions') {
+        this.sessions = this.sessions.filter(s => s.tagId !== id);
+        if (this.activeSessionId && !this.sessions.find(s => s.id === this.activeSessionId)) {
+          this.disconnect();
+          this.activeSessionId = null;
+          if (this.sessions.length > 0) {
+            this.switchSession(this.sessions[0].id);
+            return;
+          }
+        }
+      } else {
+        for (const s of this.sessions) {
+          if (s.tagId === id) s.tagId = 'uncategorized';
+        }
+      }
+      await this.refreshTags();
+    } catch (e) {
+      console.error('deleteTag error:', e);
+    }
+  }
+
+  private async refreshTags(): Promise<void> {
+    try {
+      const res = await fetch('/api/tags');
+      if (res.ok) {
+        this.tags = await res.json();
+      }
+    } catch {}
+    this.sessionList.render(this.sessions, this.tags, this.activeSessionId);
   }
 
   private connect(sessionId: string): void {
@@ -971,7 +1139,7 @@ class App {
     const s = this.sessions.find((x) => x.id === id);
     if (s) {
       s.status = status as any;
-      this.sessionList.render(this.sessions, this.activeSessionId);
+      this.sessionList.render(this.sessions, this.tags, this.activeSessionId);
       if (this.activeSessionId === id) {
         this.sessionInfo.render(s);
       }

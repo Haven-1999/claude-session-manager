@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { WebSocketServer } from 'ws';
 import type { SessionManager } from './session/manager';
+import { UNCATEGORIZED_TAG_ID } from './session/types';
 import { setupWebSocketRouter } from './ws/router';
 import { setupShellWebSocketRouter } from './ws/shell-router';
 import { FileService } from './file/service';
@@ -38,7 +39,78 @@ export function createHttpServer(manager: SessionManager, options: Pick<ServerOp
     });
   }
 
-  // REST API
+  // --- Tag API ---
+
+  app.get('/api/tags', (_req, res) => {
+    res.json(manager.listTags());
+  });
+
+  app.post('/api/tags', (req, res) => {
+    const { name } = req.body;
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'name is required' });
+    }
+    try {
+      const tag = manager.createTag(name.trim());
+      res.status(201).json(tag);
+    } catch (err: any) {
+      if (err.message?.includes('UNIQUE constraint')) {
+        return res.status(409).json({ error: 'Tag name already exists' });
+      }
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.patch('/api/tags/:id', (req, res) => {
+    const { id } = req.params;
+    if (id === UNCATEGORIZED_TAG_ID) {
+      return res.status(403).json({ error: 'Cannot rename uncategorized tag' });
+    }
+    const { name } = req.body;
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'name is required' });
+    }
+    const tag = manager.getTag(id);
+    if (!tag) return res.status(404).json({ error: 'Tag not found' });
+    try {
+      manager.updateTag(id, name.trim());
+      res.json({ ...tag, name: name.trim() });
+    } catch (err: any) {
+      if (err.message?.includes('UNIQUE constraint')) {
+        return res.status(409).json({ error: 'Tag name already exists' });
+      }
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete('/api/tags/:id', (req, res) => {
+    const { id } = req.params;
+    if (id === UNCATEGORIZED_TAG_ID) {
+      return res.status(403).json({ error: 'Cannot delete uncategorized tag' });
+    }
+    const tag = manager.getTag(id);
+    if (!tag) return res.status(404).json({ error: 'Tag not found' });
+    const action = req.query.action as string;
+    if (action !== 'move_uncategorized' && action !== 'delete_sessions') {
+      return res.status(400).json({ error: 'action query parameter is required (move_uncategorized or delete_sessions)' });
+    }
+    manager.deleteTag(id, action);
+    res.status(204).send();
+  });
+
+  // --- Path completions API ---
+
+  app.get('/api/path-completions', (req, res) => {
+    const partial = req.query.partial as string;
+    if (!partial || typeof partial !== 'string') {
+      return res.json([]);
+    }
+    const dirs = manager.listDirectories(partial);
+    res.json(dirs);
+  });
+
+  // --- Session API ---
+
   app.get('/api/sessions', (_req, res) => {
     res.json(manager.listSessions().map(s => ({
       id: s.id,
@@ -48,19 +120,20 @@ export function createHttpServer(manager: SessionManager, options: Pick<ServerOp
       createdAt: s.createdAt,
       lastActiveAt: s.lastActiveAt,
       claudeSessionId: s.claudeSessionId,
+      tagId: s.tagId,
     })));
   });
 
   app.post('/api/sessions', (req, res) => {
-    const { name, cwd } = req.body;
+    const { name, cwd, tagId } = req.body;
     if (!cwd || typeof cwd !== 'string') {
       return res.status(400).json({ error: 'cwd is required' });
     }
-    // Validate cwd is absolute and exists
     if (!path.isAbsolute(cwd)) {
       return res.status(400).json({ error: 'cwd must be absolute path' });
     }
-    const session = manager.createSession(name || `session-${Date.now()}`, cwd);
+    const resolvedTagId = tagId || UNCATEGORIZED_TAG_ID;
+    const session = manager.createSession(name || `session-${Date.now()}`, cwd, resolvedTagId);
     res.status(201).json({
       id: session.id,
       name: session.name,
@@ -68,15 +141,17 @@ export function createHttpServer(manager: SessionManager, options: Pick<ServerOp
       status: session.status,
       createdAt: session.createdAt,
       lastActiveAt: session.lastActiveAt,
+      tagId: session.tagId,
     });
   });
 
   app.patch('/api/sessions/:id', (req, res) => {
-    const { name } = req.body;
+    const { name, tagId } = req.body;
     const session = manager.getSession(req.params.id);
     if (!session) return res.status(404).json({ error: 'Not found' });
     if (name) manager.renameSession(req.params.id, name);
-    res.json({ id: session.id, name: session.name });
+    if (tagId) manager.moveSession(req.params.id, tagId);
+    res.json({ id: session.id, name: session.name, tagId: session.tagId });
   });
 
   app.delete('/api/sessions/:id', (req, res) => {
@@ -87,7 +162,6 @@ export function createHttpServer(manager: SessionManager, options: Pick<ServerOp
   });
 
   app.get('/api/cwd-suggestions', (_req, res) => {
-    // TODO: implement via MemoryService if needed; stub for now
     res.json([]);
   });
 
