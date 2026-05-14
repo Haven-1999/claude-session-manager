@@ -98,13 +98,25 @@ verify_node_pty() {
   return 1
 }
 
+verify_python_fallback() {
+  info "Verifying Python PTY fallback..."
+  if ! command -v python3 &>/dev/null; then
+    return 1
+  fi
+  # Test that Python can create a PTY
+  if python3 -c "import pty,os;m,s=pty.openpty();os.close(m);os.close(s);print('ok')" 2>/dev/null | grep -q ok; then
+    success "Python PTY fallback: OK (python3 $(python3 --version 2>&1 | awk '{print $2}'))"
+    return 0
+  fi
+  return 1
+}
+
 rebuild_node_pty() {
   warn "node-pty prebuilt binary not working, rebuilding from source..."
-  npm rebuild node-pty
+  npm rebuild node-pty 2>/dev/null
   if verify_node_pty; then
     return 0
   fi
-  error "node-pty rebuild failed."
   return 1
 }
 
@@ -172,17 +184,30 @@ main() {
   npm install --ignore-scripts
   npm rebuild better-sqlite3 2>/dev/null || true
 
-  # Step 5: Verify node-pty (rebuild if needed, fallback to Node 20)
+  # Step 5: Verify PTY support (node-pty preferred, Python fallback acceptable)
   if ! verify_node_pty; then
     rebuild_node_pty || {
-      warn "node-pty incompatible with Node.js $(node --version)."
-      info "Switching to Node.js 20 (known compatible)..."
+      warn "node-pty incompatible with current system."
+      # Try switching to Node 20
+      info "Attempting Node.js 20 (known compatible with node-pty)..."
       if ! switch_to_node20; then
-        error "Cannot get node-pty working."
-        error "Manual fix: nvm install 20 && nvm use 20 && rm -rf node_modules && npm install"
-        exit 1
+        # node-pty completely broken - check Python fallback
+        warn "node-pty unavailable on this system."
+        if verify_python_fallback; then
+          info "Server will use Python PTY fallback (fully functional)."
+        else
+          error "Neither node-pty nor Python PTY fallback available."
+          error "Please install python3 or fix node-pty."
+          exit 1
+        fi
       fi
     }
+  fi
+
+  # Step 6: Verify Python3 is available (needed for PTY fallback)
+  if ! command -v python3 &>/dev/null; then
+    warn "python3 not found. If node-pty fails at runtime, PTY fallback won't work."
+    warn "Consider installing python3 for maximum compatibility."
   fi
 
   # Step 6: Build

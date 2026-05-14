@@ -27,6 +27,13 @@ function hasBuildTools() {
   return spawnSync('which', ['gcc'], { stdio: 'pipe' }).status === 0;
 }
 
+function hasPythonFallback() {
+  const result = spawnSync('python3', [
+    '-c', 'import pty,os;m,s=pty.openpty();os.close(m);os.close(s);print("ok")',
+  ], { timeout: 5000, stdio: 'pipe' });
+  return result.status === 0 && result.stdout?.toString().trim() === 'ok';
+}
+
 function main() {
   if (!fs.existsSync(nodePtyDir)) return;
   if (isCI) return;
@@ -39,39 +46,39 @@ function main() {
     return;
   }
 
-  warn('node-pty prebuilt binary not working, rebuilding from source...');
+  warn('node-pty prebuilt binary not working, attempting rebuild...');
 
-  if (!hasBuildTools()) {
-    error('Build tools not found!');
-    if (process.platform === 'darwin') {
-      error('Please run: xcode-select --install');
-    } else {
-      error('Please install gcc and make');
+  if (hasBuildTools()) {
+    try {
+      execSync('npm rebuild node-pty', {
+        stdio: 'inherit',
+        cwd: path.join(__dirname, '..'),
+        timeout: 120000,
+      });
+    } catch (e) {
+      // rebuild failed, continue to fallback check
     }
-    error('Then re-run: npm install');
-    process.exit(1);
+
+    if (testNodePty()) {
+      log('node-pty rebuilt and verified: OK');
+      return;
+    }
   }
 
-  try {
-    execSync('npm rebuild node-pty', {
-      stdio: 'inherit',
-      cwd: path.join(__dirname, '..'),
-      timeout: 120000,
-    });
-  } catch (e) {
-    error(`Rebuild failed: ${e.message}`);
-    error('Try: nvm install 20 && nvm use 20 && rm -rf node_modules && npm install');
-    error('Or run: bash scripts/setup.sh');
-    process.exit(1);
+  // node-pty doesn't work - check if Python fallback is available
+  if (hasPythonFallback()) {
+    warn('node-pty unavailable, but Python PTY fallback is ready.');
+    warn('The server will work normally using python3 for PTY allocation.');
+    return; // Don't exit(1) - fallback is fine
   }
 
-  if (testNodePty()) {
-    log('node-pty rebuilt and verified: OK');
-  } else {
-    warn('node-pty still not working after rebuild.');
-    warn('The server will use script-based PTY fallback on this system.');
-    warn('For best experience, try: nvm install 20 && nvm use 20 && rm -rf node_modules && npm install');
-  }
+  // Neither works
+  error('node-pty failed and python3 PTY fallback not available.');
+  error('Please install python3, or fix node-pty:');
+  error('  Option 1: Install python3 (macOS: already included, Linux: apt install python3)');
+  error('  Option 2: bash scripts/setup.sh (auto-fixes node-pty)');
+  error('  Option 3: nvm install 20 && nvm use 20 && rm -rf node_modules && npm install');
+  process.exit(1);
 }
 
 main();
