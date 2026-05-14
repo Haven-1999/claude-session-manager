@@ -120,7 +120,7 @@ class ScriptPtyHandle extends EventEmitter implements PtyHandle {
   }) {
     super();
     // Use Python pty module to create a real PTY (works on macOS 26+)
-    const helperPath = path.join(__dirname, '../../scripts/pty-helper.py');
+    const helperPath = path.join(__dirname, '../../../scripts/pty-helper.py');
     this.proc = spawn('python3', [helperPath, shell, ...shellArgs], {
       cwd: options.cwd,
       env: { ...options.env, COLUMNS: String(options.cols), LINES: String(options.rows) },
