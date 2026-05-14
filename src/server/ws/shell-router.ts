@@ -6,6 +6,7 @@ import * as path from 'path';
 import type { SessionManager } from '../session/manager';
 import type { PtyHandle } from '../session/pty';
 import { spawn } from 'child_process';
+import { StringDecoder } from 'string_decoder';
 
 interface ShellMessage {
   type: 'input' | 'resize' | 'ping';
@@ -84,8 +85,16 @@ function spawnShellProcess(shell: string, args: string[], cwd: string, cols: num
   });
   return {
     onData: (cb) => {
-      cp.stdout?.on('data', (chunk: Buffer) => cb(chunk.toString('utf8')));
-      cp.stderr?.on('data', (chunk: Buffer) => cb(chunk.toString('utf8')));
+      const stdoutDecoder = new StringDecoder('utf8');
+      const stderrDecoder = new StringDecoder('utf8');
+      cp.stdout?.on('data', (chunk: Buffer) => {
+        const str = stdoutDecoder.write(chunk);
+        if (str) cb(str);
+      });
+      cp.stderr?.on('data', (chunk: Buffer) => {
+        const str = stderrDecoder.write(chunk);
+        if (str) cb(str);
+      });
     },
     onExit: (cb) => cp.on('exit', (code) => cb({ exitCode: code ?? 1 })),
     write: (data) => cp.stdin?.write(data),

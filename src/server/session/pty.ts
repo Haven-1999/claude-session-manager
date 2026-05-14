@@ -6,6 +6,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { execFileSync, spawnSync, spawn, type ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
+import { StringDecoder } from 'string_decoder';
 
 let resolvedClaudePath: string | null = null;
 
@@ -132,8 +133,16 @@ class ScriptPtyHandle extends EventEmitter implements PtyHandle {
   }
 
   onData(cb: (data: string) => void): void {
-    this.proc.stdout?.on('data', (chunk: Buffer) => cb(chunk.toString('utf8')));
-    this.proc.stderr?.on('data', (chunk: Buffer) => cb(chunk.toString('utf8')));
+    const stdoutDecoder = new StringDecoder('utf8');
+    const stderrDecoder = new StringDecoder('utf8');
+    this.proc.stdout?.on('data', (chunk: Buffer) => {
+      const str = stdoutDecoder.write(chunk);
+      if (str) cb(str);
+    });
+    this.proc.stderr?.on('data', (chunk: Buffer) => {
+      const str = stderrDecoder.write(chunk);
+      if (str) cb(str);
+    });
   }
 
   onExit(cb: (exit: { exitCode: number }) => void): void {
