@@ -60,6 +60,8 @@ function main() {
     });
   } catch (e) {
     error(`Rebuild failed: ${e.message}`);
+    error('Try: nvm install 20 && nvm use 20 && rm -rf node_modules && npm install');
+    error('Or run: bash scripts/setup.sh');
     process.exit(1);
   }
 
@@ -67,7 +69,9 @@ function main() {
     log('node-pty rebuilt and verified: OK');
   } else {
     error('node-pty still not working after rebuild.');
-    error('Try: nvm install 20 && nvm use 20 && rm -rf node_modules && npm install');
+    error('Your Node.js version may be incompatible with node-pty.');
+    error('Fix: nvm install 20 && nvm use 20 && rm -rf node_modules && npm install');
+    error('Or run: bash scripts/setup.sh (auto-switches Node version)');
     process.exit(1);
   }
 }

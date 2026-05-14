@@ -108,6 +108,37 @@ rebuild_node_pty() {
   return 1
 }
 
+switch_to_node20() {
+  if ! command -v nvm &>/dev/null && [[ -s "$HOME/.nvm/nvm.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "$HOME/.nvm/nvm.sh"
+  fi
+
+  if ! command -v nvm &>/dev/null; then
+    warn "nvm not found, installing..."
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+    export NVM_DIR="$HOME/.nvm"
+    # shellcheck source=/dev/null
+    source "$NVM_DIR/nvm.sh"
+  fi
+
+  nvm install 20
+  nvm use 20
+  info "Switched to Node.js $(node --version)"
+
+  info "Reinstalling dependencies with Node.js 20..."
+  rm -rf node_modules
+  npm install --ignore-scripts
+  npm rebuild better-sqlite3 2>/dev/null || true
+  npm rebuild node-pty
+
+  if verify_node_pty; then
+    success "node-pty works with Node.js $(node --version)"
+    return 0
+  fi
+  return 1
+}
+
 main() {
   info "=========================================="
   info "  Claude Session Manager - Setup"
@@ -129,16 +160,21 @@ main() {
     fi
   fi
 
-  # Step 4: Install dependencies
+  # Step 4: Install dependencies (skip postinstall exit on failure)
   info "Installing dependencies..."
-  npm install
+  npm install --ignore-scripts
+  npm rebuild better-sqlite3 2>/dev/null || true
 
-  # Step 5: Verify node-pty (rebuild if needed)
+  # Step 5: Verify node-pty (rebuild if needed, fallback to Node 20)
   if ! verify_node_pty; then
     rebuild_node_pty || {
-      error "Cannot get node-pty working."
-      error "Try manually: nvm install 20 && nvm use 20 && rm -rf node_modules && npm install"
-      exit 1
+      warn "node-pty incompatible with Node.js $(node --version)."
+      info "Switching to Node.js 20 (known compatible)..."
+      if ! switch_to_node20; then
+        error "Cannot get node-pty working."
+        error "Manual fix: nvm install 20 && nvm use 20 && rm -rf node_modules && npm install"
+        exit 1
+      fi
     }
   fi
 
