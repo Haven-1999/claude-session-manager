@@ -2,6 +2,7 @@ import type { IncomingMessage } from 'http';
 import type { WebSocket, WebSocketServer } from 'ws';
 import * as pty from 'node-pty';
 import * as os from 'os';
+import * as path from 'path';
 import type { SessionManager } from '../session/manager';
 import type { PtyHandle } from '../session/pty';
 import { spawn } from 'child_process';
@@ -66,9 +67,10 @@ function spawnShellProcess(shell: string, args: string[], cwd: string, cols: num
     };
   }
 
-  // Fallback: use macOS `script` for PTY
-  console.log('[CSM Shell] using script-based fallback');
-  const cp = spawn('/usr/bin/script', ['-q', '/dev/null', shell, ...args], {
+  // Fallback: use Python pty helper
+  console.log('[CSM Shell] using python-pty fallback');
+  const helperPath = path.join(__dirname, '../../../scripts/pty-helper.py');
+  const cp = spawn('python3', [helperPath, shell, ...args], {
     cwd,
     env: {
       ...process.env,

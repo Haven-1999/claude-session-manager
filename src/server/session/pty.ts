@@ -119,22 +119,16 @@ class ScriptPtyHandle extends EventEmitter implements PtyHandle {
     rows: number;
   }) {
     super();
-    const envArgs: string[] = [];
-    for (const [k, v] of Object.entries(options.env)) {
-      envArgs.push(`${k}=${v}`);
-    }
-    const innerCmd = [shell, ...shellArgs].map(a => a.replace(/'/g, "'\\''")).map(a => `'${a}'`).join(' ');
-
-    // Use `script -q /dev/null` on macOS to create a real PTY
-    // env -i sets a clean environment, then runs script which allocates a PTY
-    this.proc = spawn('/usr/bin/script', ['-q', '/dev/null', shell, ...shellArgs], {
+    // Use Python pty module to create a real PTY (works on macOS 26+)
+    const helperPath = path.join(__dirname, '../../scripts/pty-helper.py');
+    this.proc = spawn('python3', [helperPath, shell, ...shellArgs], {
       cwd: options.cwd,
       env: { ...options.env, COLUMNS: String(options.cols), LINES: String(options.rows) },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
     this.pid = this.proc.pid!;
-    console.log(`[CSM PTY] script-fallback spawned, pid=${this.pid}`);
+    console.log(`[CSM PTY] python-pty-fallback spawned, pid=${this.pid}`);
   }
 
   onData(cb: (data: string) => void): void {
