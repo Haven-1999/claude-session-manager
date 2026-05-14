@@ -244,8 +244,8 @@ export function createHttpServer(manager: SessionManager, options: Pick<ServerOp
   // Static files with caching
   const publicPath = path.join(__dirname, '../../public');
   app.use(express.static(publicPath, {
-    maxAge: '1h',
-    etag: true,
+    maxAge: 0,
+    etag: false,
   }));
   app.get('/', (_req, res) => {
     res.sendFile(path.join(publicPath, 'index.html'));
