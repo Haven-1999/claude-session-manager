@@ -604,9 +604,11 @@ html, body, #app {
 /* Terminal Area */
 .terminal-area {
   flex: 1;
+  min-width: 0;
   position: relative;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: var(--bg-primary);
 }
 
