@@ -1,10 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'events';
 import { WebSocketServer } from 'ws';
-import { setupShellWebSocketRouter } from '../../src/server/ws/shell-router';
-import { SessionManager } from '../../src/server/session/manager';
-import { MemoryService } from '../../src/server/memory/service';
-import * as fs from 'fs';
+import { setupShellWebSocketRouter, resolveShell } from '../../src/server/ws/shell-router';
 
 vi.mock('node-pty', () => ({
   spawn: vi.fn(),
@@ -62,7 +59,29 @@ class MockPty {
   }
 }
 
-const TEST_DB = '/tmp/csm-shell-router-test.db';
+type TestSession = {
+  id: string;
+  cwd: string;
+};
+
+class TestManager {
+  private sessions = new Map<string, TestSession>();
+  touched: string[] = [];
+
+  createSession(name: string, cwd: string): TestSession {
+    const session = { id: name, cwd };
+    this.sessions.set(session.id, session);
+    return session;
+  }
+
+  getSession(id: string): TestSession | undefined {
+    return this.sessions.get(id);
+  }
+
+  touch(id: string): void {
+    this.touched.push(id);
+  }
+}
 
 function connect(wss: MockWss, url: string) {
   const ws = new MockWs();
@@ -71,17 +90,21 @@ function connect(wss: MockWss, url: string) {
 }
 
 describe('setupShellWebSocketRouter', () => {
-  let manager: SessionManager;
+  let manager: TestManager;
   let wss: MockWss;
   let ptyProcess: MockPty;
 
   beforeEach(async () => {
-    if (fs.existsSync(TEST_DB)) fs.unlinkSync(TEST_DB);
-    manager = new SessionManager(new MemoryService(TEST_DB));
+    manager = new TestManager();
     wss = new MockWss();
     ptyProcess = new MockPty();
     const nodePty = await import('node-pty');
     vi.mocked(nodePty.spawn).mockReturnValue(ptyProcess as any);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
   });
 
   it('rejects connections without a session id', () => {
@@ -100,7 +123,12 @@ describe('setupShellWebSocketRouter', () => {
     expect(ws.closed).toEqual({ code: 1008, reason: 'Session not found' });
   });
 
-  it('spawns the default shell in the session cwd', async () => {
+  it('prefers the login shell over an inherited sh process shell', () => {
+    expect(resolveShell('/bin/sh', '/bin/zsh')).toBe('/bin/zsh');
+  });
+
+  it('starts login shells as login shells', async () => {
+    vi.stubEnv('SHELL', '/bin/zsh');
     const session = manager.createSession('project', '/tmp');
     setupShellWebSocketRouter(wss as unknown as WebSocketServer, manager);
 
@@ -108,8 +136,8 @@ describe('setupShellWebSocketRouter', () => {
 
     const nodePty = await import('node-pty');
     expect(nodePty.spawn).toHaveBeenCalledWith(
-      expect.any(String),
-      [],
+      '/bin/zsh',
+      ['-l'],
       expect.objectContaining({ cwd: '/tmp', cols: 120, rows: 30, name: 'xterm-256color' }),
     );
   });

@@ -11,9 +11,14 @@ interface ShellMessage {
   rows?: number;
 }
 
-function defaultShell(): string {
+export function resolveShell(processShell = process.env.SHELL, userShell = os.userInfo().shell): string {
   if (process.platform === 'win32') return 'powershell.exe';
-  return process.env.SHELL || os.userInfo().shell || '/bin/sh';
+  if (userShell && processShell === '/bin/sh') return userShell;
+  return processShell || userShell || '/bin/sh';
+}
+
+function shellArgs(shell: string): string[] {
+  return shell.endsWith('/zsh') || shell.endsWith('/bash') ? ['-l'] : [];
 }
 
 export function setupShellWebSocketRouter(wss: WebSocketServer, manager: SessionManager): void {
@@ -34,7 +39,8 @@ export function setupShellWebSocketRouter(wss: WebSocketServer, manager: Session
     let shellProcess: pty.IPty | null = null;
 
     try {
-      shellProcess = pty.spawn(defaultShell(), [], {
+      const shell = resolveShell();
+      shellProcess = pty.spawn(shell, shellArgs(shell), {
         name: 'xterm-256color',
         cols: 120,
         rows: 30,
