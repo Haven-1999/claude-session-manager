@@ -4,7 +4,7 @@ import WebSocket from 'ws';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { execFileSync } from 'child_process';
+import { execFileSync, spawnSync } from 'child_process';
 
 let resolvedClaudePath: string | null = null;
 
@@ -129,7 +129,31 @@ export function spawnPty(options: PtyOptions): pty.IPty {
   console.log(`[CSM PTY] env:`, JSON.stringify(spawnEnv));
   console.log(`[CSM PTY] cwd: ${cwd} (accessible=${(() => { try { fs.accessSync(cwd, fs.constants.R_OK | fs.constants.X_OK); return true; } catch { return false; } })()})`);
 
-  // Diagnostic: try spawning a minimal command first
+  // Diagnostic: test child_process.spawn (no PTY) to isolate the issue
+  try {
+    const cpResult = spawnSync('/bin/echo', ['cp-test-ok'], { encoding: 'utf8', timeout: 3000 });
+    console.log(`[CSM PTY] diagnostic child_process.spawnSync: status=${cpResult.status} stdout=${cpResult.stdout?.trim()} error=${cpResult.error?.message || 'none'}`);
+  } catch (cpErr: any) {
+    console.error(`[CSM PTY] diagnostic child_process FAILED:`, cpErr.message);
+  }
+
+  // Diagnostic: check system PTY/fd limits
+  try {
+    const ulimitResult = spawnSync('/bin/sh', ['-c', 'ulimit -n'], { encoding: 'utf8', timeout: 3000 });
+    const ptmxExists = fs.existsSync('/dev/ptmx');
+    console.log(`[CSM PTY] system: ulimit-n=${ulimitResult.stdout?.trim()} /dev/ptmx=${ptmxExists}`);
+  } catch { /* ignore */ }
+
+  // Diagnostic: check node-pty native addon
+  try {
+    const ptyNativePath = require.resolve('node-pty/build/Release/pty.node');
+    const ptyNativeStat = fs.statSync(ptyNativePath);
+    console.log(`[CSM PTY] native addon: path=${ptyNativePath} size=${ptyNativeStat.size}`);
+  } catch (e: any) {
+    console.error(`[CSM PTY] native addon NOT FOUND:`, e.message);
+  }
+
+  // Diagnostic: try spawning a minimal command via node-pty
   try {
     const testProc = pty.spawn('/bin/echo', ['pty-test-ok'], {
       name: 'xterm-256color',
@@ -138,10 +162,10 @@ export function spawnPty(options: PtyOptions): pty.IPty {
       cwd: os.homedir(),
       env: { HOME: os.homedir(), PATH: '/usr/bin:/bin' },
     });
-    console.log(`[CSM PTY] diagnostic spawn /bin/echo succeeded, pid=${(testProc as any).pid}`);
+    console.log(`[CSM PTY] diagnostic pty.spawn /bin/echo succeeded, pid=${(testProc as any).pid}`);
     testProc.kill();
   } catch (diagErr: any) {
-    console.error(`[CSM PTY] diagnostic spawn /bin/echo ALSO FAILED:`, diagErr.message);
+    console.error(`[CSM PTY] diagnostic pty.spawn /bin/echo FAILED:`, diagErr.message);
   }
 
   try {
