@@ -109,7 +109,7 @@ export function spawnPty(options: PtyOptions): pty.IPty {
     }
   }
 
-  console.log(`[CSM PTY] env: HOME=${process.env.HOME || ''} PATH=${cleanedPath} SHELL=${process.env.SHELL || ''}`);
+  console.log(`[CSM PTY] env: HOME=${process.env.HOME || ''} SHELL=${process.env.SHELL || ''}`);
 
   try {
     const shell = process.env.SHELL || '/bin/zsh';
@@ -121,7 +121,9 @@ export function spawnPty(options: PtyOptions): pty.IPty {
       cwd,
       encoding: 'utf8',
       env: {
-        ...process.env,
+        HOME: process.env.HOME || os.homedir(),
+        USER: process.env.USER || '',
+        SHELL: shell,
         PATH: cleanedPath,
         CLAUDE_CSM_MODE: '1',
         TERM: 'xterm-256color',
