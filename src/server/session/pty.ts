@@ -84,10 +84,37 @@ export function spawnPty(options: PtyOptions): pty.IPty {
   const args = resumeClaudeId ? ['--resume', resumeClaudeId] : [];
   const cleanedPath = cleanPath(process.env.PATH);
   console.log(`[CSM PTY] spawn: ${resolved} ${args.join(' ')} in ${cwd} (${cols}x${rows}) resume=${!!resumeClaudeId}`);
+
+  // Pre-flight checks
+  if (process.platform !== 'win32') {
+    try {
+      const stat = fs.statSync(resolved);
+      const isExecutable = !!(stat.mode & 0o111);
+      console.log(`[CSM PTY] file check: exists=${true} size=${stat.size} executable=${isExecutable} isSymlink=${fs.lstatSync(resolved).isSymbolicLink()}`);
+      if (stat.size === 0) {
+        throw new Error(`Claude binary is empty (0 bytes): ${resolved}`);
+      }
+      if (!isExecutable) {
+        throw new Error(`Claude binary is not executable: ${resolved}`);
+      }
+    } catch (e: any) {
+      if (e.code === 'ENOENT') {
+        throw new Error(`Claude binary not found: ${resolved}`);
+      }
+      throw e;
+    }
+    // Check if cwd exists
+    if (!fs.existsSync(cwd)) {
+      throw new Error(`Working directory does not exist: ${cwd}`);
+    }
+  }
+
   console.log(`[CSM PTY] env: HOME=${process.env.HOME || ''} PATH=${cleanedPath} SHELL=${process.env.SHELL || ''}`);
 
   try {
-    const proc = pty.spawn(resolved, args, {
+    const shell = process.env.SHELL || '/bin/zsh';
+    const cmdParts = [resolved, ...args].map(a => a.replace(/'/g, "'\\''")).map(a => `'${a}'`).join(' ');
+    const proc = pty.spawn(shell, ['-lc', `exec ${cmdParts}`], {
       name: 'xterm-256color',
       cols,
       rows,
