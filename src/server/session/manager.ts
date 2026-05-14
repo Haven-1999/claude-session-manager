@@ -1,4 +1,5 @@
-import type { Session, SessionStatus } from './types';
+import type { Session, SessionStatus, Tag } from './types';
+import { UNCATEGORIZED_TAG_ID } from './types';
 import type { MemoryService } from '../memory/service';
 import type WebSocket from 'ws';
 
@@ -8,8 +9,57 @@ export class SessionManager {
 
   constructor(private memory: MemoryService) {}
 
-  createSession(name: string, cwd: string): Session {
-    const record = this.memory.createSession({ name, cwd, status: 'running' });
+  // --- Tag methods ---
+
+  createTag(name: string): Tag {
+    return this.memory.createTag(name);
+  }
+
+  listTags(): Tag[] {
+    return this.memory.listTags();
+  }
+
+  getTag(id: string): Tag | undefined {
+    return this.memory.getTag(id);
+  }
+
+  updateTag(id: string, name: string): void {
+    this.memory.updateTag(id, { name });
+  }
+
+  deleteTag(id: string, action: 'move_uncategorized' | 'delete_sessions'): string[] {
+    if (action === 'delete_sessions') {
+      const deletedIds = this.memory.deleteSessionsByTag(id);
+      for (const sid of deletedIds) {
+        const s = this.sessions.get(sid);
+        if (s) {
+          if (s.ptyProcess) {
+            s.ptyProcess.kill('SIGTERM');
+            s.ptyProcess = null;
+          }
+          s.clients.forEach(ws => ws.close());
+          s.clients.clear();
+          this.sessions.delete(sid);
+        }
+      }
+      this.memory.deleteTag(id);
+      return deletedIds;
+    } else {
+      this.memory.moveSessionsToTag(id, UNCATEGORIZED_TAG_ID);
+      for (const s of this.sessions.values()) {
+        if (s.tagId === id) {
+          s.tagId = UNCATEGORIZED_TAG_ID;
+        }
+      }
+      this.memory.deleteTag(id);
+      return [];
+    }
+  }
+
+  // --- Session methods ---
+
+  createSession(name: string, cwd: string, tagId: string): Session {
+    const record = this.memory.createSession({ name, cwd, status: 'running', tag_id: tagId });
     const session: Session = {
       id: record.id,
       name: record.name,
@@ -20,6 +70,7 @@ export class SessionManager {
       ptyProcess: null,
       clients: new Set(),
       claudeSessionId: record.claude_session_id,
+      tagId: record.tag_id,
       outputBuffer: [],
       outputBufferStartIndex: 0,
     };
@@ -40,6 +91,13 @@ export class SessionManager {
     if (!s) return;
     s.name = name;
     this.memory.updateSession(id, { name });
+  }
+
+  moveSession(id: string, tagId: string): void {
+    const s = this.sessions.get(id);
+    if (!s) return;
+    s.tagId = tagId;
+    this.memory.updateSession(id, { tag_id: tagId });
   }
 
   updateStatus(id: string, status: SessionStatus): void {
@@ -127,9 +185,16 @@ export class SessionManager {
         ptyProcess: null,
         clients: new Set(),
         claudeSessionId: r.claude_session_id,
+        tagId: r.tag_id,
         outputBuffer: [],
         outputBufferStartIndex: 0,
       });
     }
+  }
+
+  // --- Path completion ---
+
+  listDirectories(partial: string): string[] {
+    return this.memory.listDirectories(partial);
   }
 }

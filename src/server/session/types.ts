@@ -13,6 +13,7 @@ export interface Session {
   createdAt: number;
   lastActiveAt: number;
   claudeSessionId?: string | null;
+  tagId: string;
   outputBuffer: string[];
   outputBufferStartIndex: number;
 }
@@ -25,4 +26,21 @@ export interface SessionRecord {
   created_at: number;
   last_active_at: number;
   claude_session_id?: string | null;
+  tag_id: string;
 }
+
+export interface Tag {
+  id: string;
+  name: string;
+  sortOrder: number;
+  createdAt: number;
+}
+
+export interface TagRecord {
+  id: string;
+  name: string;
+  sort_order: number;
+  created_at: number;
+}
+
+export const UNCATEGORIZED_TAG_ID = 'uncategorized';
