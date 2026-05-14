@@ -87,6 +87,8 @@ npm start -- --host 0.0.0.0
 | **Docker 单容器** | 隔离环境，端口映射到宿主机 |
 | **Docker + csm-proxy** | 一台服务器多实例，自动分配端口 |
 
+> **Windows 支持**：目前正在适配中，暂时建议在 Mac 或 Linux 环境下运行。
+
 ### Docker 单容器
 
 ```bash
