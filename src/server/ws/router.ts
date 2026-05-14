@@ -64,6 +64,7 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
     let pendingInput: string[] = [];
     let pendingResize: { cols: number; rows: number } | null = null;
     let isSpawning = false;
+    let lastSpawnFailure = 0;
 
     const ensurePty = (): boolean => {
       if (session!.ptyProcess) {
@@ -73,6 +74,10 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
       if (isSpawning) {
         console.log(`[CSM WS] ensurePty: spawn already in progress for ${session!.id}`);
         return true;
+      }
+      if (lastSpawnFailure && Date.now() - lastSpawnFailure < 10000) {
+        console.log(`[CSM WS] ensurePty: spawn failed recently for ${session!.id}, skipping retry`);
+        return false;
       }
 
       if (session!.status === 'stopped') {
@@ -158,6 +163,7 @@ export function setupWebSocketRouter(wss: WebSocketServer, manager: SessionManag
         return true;
       } catch (err) {
         isSpawning = false;
+        lastSpawnFailure = Date.now();
         session!.ptyProcess = null;
         console.error(`[CSM WS] Failed to spawn PTY for session ${session!.id}`, err);
         manager.updateStatus(session!.id, 'stopped');

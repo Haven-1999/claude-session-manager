@@ -53,20 +53,13 @@ export class SessionList {
                     this.expandState[tag.id] = true;
                 }
                 else {
-                    this.expandState[tag.id] = false;
+                    // Auto-expand if it contains the active session
+                    const tagSessions = sessionsByTag.get(tag.id) || [];
+                    this.expandState[tag.id] = activeId ? tagSessions.some((s) => s.id === activeId) : false;
                 }
             }
             if (tag.id !== UNCATEGORIZED_TAG_ID)
                 firstUserTag = false;
-        }
-        // Auto-expand tag containing active session
-        if (activeId) {
-            for (const tag of tags) {
-                const tagSessions = sessionsByTag.get(tag.id) || [];
-                if (tagSessions.some((s) => s.id === activeId)) {
-                    this.expandState[tag.id] = true;
-                }
-            }
         }
         // Render tag groups
         for (const tag of tags) {

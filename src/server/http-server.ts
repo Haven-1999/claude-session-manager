@@ -1,4 +1,5 @@
 import express from 'express';
+import compression from 'compression';
 import * as http from 'http';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -19,6 +20,7 @@ export interface ServerOptions {
 
 export function createHttpServer(manager: SessionManager, options: Pick<ServerOptions, 'claudePath' | 'auth' | 'dataDir'>): { server: http.Server; wss: WebSocketServer } {
   const app = express();
+  app.use(compression());
   app.use(express.json({ limit: '50mb' }));
 
   // Optional basic auth
@@ -239,9 +241,12 @@ export function createHttpServer(manager: SessionManager, options: Pick<ServerOp
     }
   });
 
-  // Static files
+  // Static files with caching
   const publicPath = path.join(__dirname, '../../public');
-  app.use(express.static(publicPath));
+  app.use(express.static(publicPath, {
+    maxAge: 0,
+    etag: false,
+  }));
   app.get('/', (_req, res) => {
     res.sendFile(path.join(publicPath, 'index.html'));
   });

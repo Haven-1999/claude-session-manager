@@ -247,8 +247,39 @@ class App {
       isOpen: false,
       isReady: false,
     };
+
+    // IME deduplication (same workaround as session terminal)
+    const textarea = terminal.textarea!;
+    let isComposing = false;
+    let imeFlushTimer: number | null = null;
+    let imeBufferedData: string | null = null;
+
+    textarea.addEventListener('compositionstart', () => { isComposing = true; });
+    textarea.addEventListener('compositionend', () => {
+      isComposing = false;
+      if (imeBufferedData !== null && imeFlushTimer === null) {
+        imeFlushTimer = window.setTimeout(() => {
+          imeFlushTimer = null;
+          if (imeBufferedData !== null) {
+            if (entry.ws?.readyState === WebSocket.OPEN && this.shellVisible && entry.isReady) {
+              entry.ws.send(JSON.stringify({ type: 'input', data: imeBufferedData }));
+            }
+            imeBufferedData = null;
+          }
+        }, 30);
+      }
+    });
+
     terminal.onData((data) => {
       if (entry.ws?.readyState === WebSocket.OPEN && this.shellVisible && entry.isReady) {
+        if (isComposing) {
+          imeBufferedData = data;
+          return;
+        }
+        if (imeFlushTimer !== null) {
+          imeBufferedData = data;
+          return;
+        }
         entry.ws.send(JSON.stringify({ type: 'input', data }));
       }
     });
@@ -422,8 +453,41 @@ class App {
     container.style.display = 'none';
     container.style.zIndex = '';
 
+    // Workaround for xterm.js IME duplication: when switching input methods during
+    // composition, xterm.js fires triggerDataEvent multiple times. Buffer all onData
+    // during composition (don't start timer yet), then on compositionend start a short
+    // timer — any further onData updates the buffer. Timer fires → send only the last value.
+    const textarea = terminal.textarea!;
+    let isComposing = false;
+    let imeFlushTimer: number | null = null;
+    let imeBufferedData: string | null = null;
+
+    textarea.addEventListener('compositionstart', () => { isComposing = true; });
+    textarea.addEventListener('compositionend', () => {
+      isComposing = false;
+      if (imeBufferedData !== null && imeFlushTimer === null) {
+        imeFlushTimer = window.setTimeout(() => {
+          imeFlushTimer = null;
+          if (imeBufferedData !== null) {
+            if (this.ws?.readyState === WebSocket.OPEN && this.activeSessionId === sessionId) {
+              this.ws.send(JSON.stringify({ type: 'input', data: imeBufferedData }));
+            }
+            imeBufferedData = null;
+          }
+        }, 30);
+      }
+    });
+
     const onDataDisposable = terminal.onData((data) => {
       if (this.ws?.readyState === WebSocket.OPEN && this.activeSessionId === sessionId) {
+        if (isComposing) {
+          imeBufferedData = data;
+          return;
+        }
+        if (imeFlushTimer !== null) {
+          imeBufferedData = data;
+          return;
+        }
         this.ws.send(JSON.stringify({ type: 'input', data }));
       }
     });

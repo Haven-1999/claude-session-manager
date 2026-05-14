@@ -1,4 +1,4 @@
-import type { IPty } from 'node-pty';
+import type { PtyHandle } from './pty';
 import type WebSocket from 'ws';
 
 export type SessionStatus = 'running' | 'disconnected' | 'stopped';
@@ -8,7 +8,7 @@ export interface Session {
   name: string;
   cwd: string;
   status: SessionStatus;
-  ptyProcess: IPty | null;
+  ptyProcess: PtyHandle | null;
   clients: Set<WebSocket>;
   createdAt: number;
   lastActiveAt: number;

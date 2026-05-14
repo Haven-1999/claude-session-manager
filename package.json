@@ -17,10 +17,13 @@
     "tunnel": "node scripts/tunnel.js",
     "tunnel:daemon": "node scripts/tunnel.js daemon",
     "tunnel:stop": "node scripts/tunnel.js stop",
-    "tunnel:status": "node scripts/tunnel.js status"
+    "tunnel:status": "node scripts/tunnel.js status",
+    "postinstall": "node scripts/postinstall.js",
+    "setup": "npm install && npm run build"
   },
   "dependencies": {
     "better-sqlite3": "^12.9.0",
+    "compression": "^1.8.1",
     "express": "^4.18.2",
     "node-pty": "^1.0.0",
     "ws": "^8.16.0"
@@ -28,6 +31,7 @@
   "devDependencies": {
     "@tauri-apps/cli": "^2.10.1",
     "@types/better-sqlite3": "^7.6.13",
+    "@types/compression": "^1.8.1",
     "@types/express": "^4.17.21",
     "@types/node": "^20.10.0",
     "@types/ws": "^8.5.10",
