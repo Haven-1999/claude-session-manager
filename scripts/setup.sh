@@ -126,6 +126,10 @@ switch_to_node20() {
   nvm use 20
   info "Switched to Node.js $(node --version)"
 
+  # Pin Node version for future sessions
+  echo "20" > "$PROJECT_DIR/.nvmrc"
+  info "Created .nvmrc to pin Node.js 20 for this project"
+
   info "Reinstalling dependencies with Node.js 20..."
   rm -rf node_modules
   npm install --ignore-scripts
@@ -140,6 +144,9 @@ switch_to_node20() {
 }
 
 main() {
+  PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+  cd "$PROJECT_DIR"
+
   info "=========================================="
   info "  Claude Session Manager - Setup"
   info "=========================================="
@@ -188,11 +195,15 @@ main() {
   success "=========================================="
   echo
   info "Start the server with:"
-  info "  npm start"
+  info "  bash scripts/start.sh"
   echo
   info "Or with custom options:"
-  info "  npm start -- --port 8080 --host 0.0.0.0"
+  info "  bash scripts/start.sh --port 8080 --host 0.0.0.0"
   echo
+  if [[ -f ".nvmrc" ]]; then
+    info "Note: This project uses Node.js $(cat .nvmrc). The start script"
+    info "will automatically load the correct version via nvm."
+  fi
 }
 
 main "$@"
