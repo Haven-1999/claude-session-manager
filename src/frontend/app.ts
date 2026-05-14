@@ -249,23 +249,29 @@ class App {
     };
 
     // IME deduplication (same workaround as session terminal)
-    let lastData = '';
-    let lastDataTime = 0;
     const textarea = terminal.textarea!;
-    let compositionJustEnded = false;
+    let imeFlushTimer: number | null = null;
+    let imeBufferedData: string | null = null;
     textarea.addEventListener('compositionend', () => {
-      compositionJustEnded = true;
-      setTimeout(() => { compositionJustEnded = false; }, 50);
+      imeBufferedData = null;
+      if (imeFlushTimer !== null) clearTimeout(imeFlushTimer);
+      imeFlushTimer = window.setTimeout(() => {
+        if (imeBufferedData !== null) {
+          if (entry.ws?.readyState === WebSocket.OPEN && this.shellVisible && entry.isReady) {
+            entry.ws.send(JSON.stringify({ type: 'input', data: imeBufferedData }));
+          }
+          imeBufferedData = null;
+        }
+        imeFlushTimer = null;
+      }, 30);
     });
 
     terminal.onData((data) => {
       if (entry.ws?.readyState === WebSocket.OPEN && this.shellVisible && entry.isReady) {
-        const now = Date.now();
-        if (compositionJustEnded && data === lastData && now - lastDataTime < 80) {
+        if (imeFlushTimer !== null) {
+          imeBufferedData = data;
           return;
         }
-        lastData = data;
-        lastDataTime = now;
         entry.ws.send(JSON.stringify({ type: 'input', data }));
       }
     });
@@ -440,25 +446,33 @@ class App {
     container.style.zIndex = '';
 
     // Workaround for xterm.js IME duplication: when switching input methods during
-    // composition, both compositionend and input events fire triggerDataEvent, causing
-    // duplicate input. Deduplicate by suppressing identical data within a short window.
-    let lastData = '';
-    let lastDataTime = 0;
+    // composition, xterm.js fires triggerDataEvent twice — once from _finalizeComposition
+    // (with stale composition text including syllable spaces) and once from _inputEvent
+    // (with the correct raw text). We buffer events in a short window after compositionend
+    // and only send the last one.
     const textarea = terminal.textarea!;
-    let compositionJustEnded = false;
+    let imeFlushTimer: number | null = null;
+    let imeBufferedData: string | null = null;
     textarea.addEventListener('compositionend', () => {
-      compositionJustEnded = true;
-      setTimeout(() => { compositionJustEnded = false; }, 50);
+      imeBufferedData = null;
+      if (imeFlushTimer !== null) clearTimeout(imeFlushTimer);
+      imeFlushTimer = window.setTimeout(() => {
+        if (imeBufferedData !== null) {
+          if (this.ws?.readyState === WebSocket.OPEN && this.activeSessionId === sessionId) {
+            this.ws.send(JSON.stringify({ type: 'input', data: imeBufferedData }));
+          }
+          imeBufferedData = null;
+        }
+        imeFlushTimer = null;
+      }, 30);
     });
 
     const onDataDisposable = terminal.onData((data) => {
       if (this.ws?.readyState === WebSocket.OPEN && this.activeSessionId === sessionId) {
-        const now = Date.now();
-        if (compositionJustEnded && data === lastData && now - lastDataTime < 80) {
+        if (imeFlushTimer !== null) {
+          imeBufferedData = data;
           return;
         }
-        lastData = data;
-        lastDataTime = now;
         this.ws.send(JSON.stringify({ type: 'input', data }));
       }
     });
