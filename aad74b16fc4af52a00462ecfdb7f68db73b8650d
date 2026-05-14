@@ -1,0 +1,24 @@
+README.md
+  4dc9fe125aa0316c 3,5,7,9,11,13,15-19,21,23,25,27,29,31,33,35,37,39,41,43,45,55,57,67,69,71,73-79,81,83-88,90,94,100,105,108,110,112,116,123-125,127,129-132,136-139,146-147,149,152-165,168,170-172,174,176-179,184-186,191-194
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.14",
+  "base_commit_sha": "aad74b16fc4af52a00462ecfdb7f68db73b8650d",
+  "prompts": {
+    "4dc9fe125aa0316c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9edb0ef2-ba10-4a9f-9eea-79b1a23b52f0",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Haven-1999 <2367682634@qq.com>",
+      "messages": [],
+      "total_additions": 144,
+      "total_deletions": 268,
+      "accepted_lines": 432,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/b4b6ff2df1d3c4172ead81f372720f4096dc31d4259f0bdd522bc84630a74ef7"
+    }
+  }
+}
