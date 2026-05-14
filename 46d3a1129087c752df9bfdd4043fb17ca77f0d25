@@ -1,0 +1,24 @@
+README.md
+  727022b644213cf3 57,77,80-84,87-88,90-91,94,96,98,101,109-110,113,115,117,120,125,134,146,152,178
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.13",
+  "base_commit_sha": "46d3a1129087c752df9bfdd4043fb17ca77f0d25",
+  "prompts": {
+    "727022b644213cf3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ad804e0-de43-48cb-ac44-1897af4a5452",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "konghaiqi <konghaiqi@cvte.com>",
+      "messages": [],
+      "total_additions": 1872,
+      "total_deletions": 77,
+      "accepted_lines": 1872,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/0ff8795cf04e7ac2c31a73b5e1644c4ae28806e090f243c80c2eed5c725711d3"
+    }
+  }
+}

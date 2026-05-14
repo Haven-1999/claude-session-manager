@@ -1,0 +1,38 @@
+docs/superpowers/specs/2026-05-12-current-path-shell-panel-design.md
+  a6320906e61970ac 1-85
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.14",
+  "base_commit_sha": "4479769ed2dc6f6f688ba3a5bd14e95aa4adb958",
+  "prompts": {
+    "727022b644213cf3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ad804e0-de43-48cb-ac44-1897af4a5452",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "konghaiqi <konghaiqi@cvte.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2192,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/dd677235017f6db0e6cc490a46ae7e7ea9d8f5a82bc8d0519ff839b7b5e1b24e"
+    },
+    "a6320906e61970ac": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6905a6f1-c7dd-4494-b3a0-a2270d3e3496",
+        "model": "gpt-5.5"
+      },
+      "human_author": "konghaiqi <konghaiqi@cvte.com>",
+      "messages": [],
+      "total_additions": 85,
+      "total_deletions": 0,
+      "accepted_lines": 85,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/5596ac19cc99cee96ccdb6bc629bbf382c938c24e8ff00951558f6d0d23859cc"
+    }
+  }
+}

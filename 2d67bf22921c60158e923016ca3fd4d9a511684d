@@ -1,0 +1,24 @@
+README.md
+  1f9b929521a41be3 3,11-14,49-50,53,60-61,63,68,79,83,87-88,92,94-129,152,162,178,205,207,209,211-212,214-223,227,245,249-251
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.14",
+  "base_commit_sha": "2d67bf22921c60158e923016ca3fd4d9a511684d",
+  "prompts": {
+    "1f9b929521a41be3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "730795cd-1b1c-41d5-ba66-bed6d11f5f6a",
+        "model": "gpt-5.5"
+      },
+      "human_author": "konghaiqi <konghaiqi@cvte.com>",
+      "messages": [],
+      "total_additions": 3489,
+      "total_deletions": 26,
+      "accepted_lines": 3489,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/3af802a75258c2172c7a643b8e20e12c412d3407525267985e241e60263db421"
+    }
+  }
+}

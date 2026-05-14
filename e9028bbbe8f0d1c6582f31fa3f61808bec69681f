@@ -1,0 +1,24 @@
+docs/superpowers/specs/2026-05-13-tag-project-spaces-design.md
+  e5899d93d965d1e7 1-71
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.14",
+  "base_commit_sha": "e9028bbbe8f0d1c6582f31fa3f61808bec69681f",
+  "prompts": {
+    "e5899d93d965d1e7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "673a7286-cbb1-4df2-9da6-fc54ab5f8039",
+        "model": "gpt-5.5"
+      },
+      "human_author": "konghaiqi <konghaiqi@cvte.com>",
+      "messages": [],
+      "total_additions": 72,
+      "total_deletions": 1,
+      "accepted_lines": 71,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/921af0fa2dcce2d731b3023f77f408ca06a284c2bf39c7d373d3badbd11e323e"
+    }
+  }
+}
