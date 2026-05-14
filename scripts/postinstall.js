@@ -35,9 +35,28 @@ function hasPythonFallback() {
 }
 
 function main() {
-  if (!fs.existsSync(nodePtyDir)) return;
   if (isCI) return;
   if (process.platform === 'win32') return;
+
+  // Rebuild better-sqlite3 if needed
+  const sqliteDir = path.join(__dirname, '..', 'node_modules', 'better-sqlite3');
+  if (fs.existsSync(sqliteDir)) {
+    const sqliteResult = spawnSync(process.execPath, [
+      '-e', "require('better-sqlite3')",
+    ], { timeout: 5000, stdio: 'pipe', cwd: path.join(__dirname, '..') });
+    if (sqliteResult.status !== 0) {
+      log('Rebuilding better-sqlite3...');
+      try {
+        execSync('npm rebuild better-sqlite3', {
+          stdio: 'inherit', cwd: path.join(__dirname, '..'), timeout: 120000,
+        });
+      } catch {
+        error('Failed to rebuild better-sqlite3. Run: npm rebuild better-sqlite3');
+      }
+    }
+  }
+
+  if (!fs.existsSync(nodePtyDir)) return;
 
   log('Verifying node-pty native module...');
 
