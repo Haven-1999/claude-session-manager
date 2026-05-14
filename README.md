@@ -8,7 +8,9 @@
 
 - **多会话管理** — 同时维护多个独立的 Claude Code 会话，每个会话有独立的工作目录和对话上下文
 - **Web 终端** — 基于 xterm.js 的完整终端模拟器，支持彩色输出、文件路径点击跳转
+- **Shell 面板** — 每个会话附带一个独立的 Shell 终端，在会话工作目录下执行命令，无需切换窗口
 - **内联代码编辑器** — 点击终端中的文件路径即可在侧边栏打开 CodeMirror 编辑器，直接修改后端所在机器上的文件
+- **图片粘贴上传** — 在终端中直接粘贴剪贴板图片，自动上传并插入到 Claude 对话
 - **会话持久化** — 后端重启后会话列表自动恢复，支持 `claude --resume` 恢复到之前的对话
 - **本地或远程浏览器访问** — Mac 本地运行时访问 `127.0.0.1`，Linux 服务器运行时访问服务器地址
 - **移动端适配** — 支持手机浏览器访问 Linux 服务器上的 CSM，窄屏下侧边栏自动收为抽屉，终端区域占满全宽
@@ -34,14 +36,14 @@
 - 每个会话维护输出缓冲区，浏览器断线重连后可回放最近输出，避免短暂网络中断造成内容丢失
 
 ### 安全
-- 服务端可选 Basic Auth，通过环境变量或启动参数配置
+- 服务端可选 Basic Auth，通过启动参数 `--auth user:password` 配置
 - 文件读写 API 对请求路径做 `path.resolve` 规范化，拒绝非绝对路径，防止目录遍历
 - 读取文件时采样前 8KB 内容检测空字节，判定为二进制则拒绝编辑；单文件编辑上限 1MB，上传上限 10MB
 - 内网、VPN 或受控服务器环境可直接开放端口访问；公网访问建议配合防火墙白名单、HTTPS、认证或反向代理
 
 ### 会话生命周期
 - 会话状态分为 `running`（有客户端连接）、`disconnected`（无客户端但 PTY 进程仍在）、`stopped`（PTY 已退出）三种
-- 会话元数据、最后活跃时间戳、Claude session ID 通过 SQLite 持久化，服务端重启后自动加载恢复
+- 会话元数据、最后活跃时间戳、Claude session ID 通过 SQLite 持久化，服务端重启后自动加载恢复（终端输出缓冲区仅保存在内存中，服务端重启后不可回放）
 - 首次启动 PTY 时异步读取 `~/.claude/sessions/<pid>.json` 获取 Claude 内部 session ID，用于后续 `claude --resume`；若 resume 后进程在 3 秒内退出，则判定 session ID 已失效，清空后重新启动新会话
 
 ## 架构
@@ -66,7 +68,7 @@ CSM 的后端运行在哪台机器上，就管理哪台机器上的 shell、文�
 │  │ - Express REST API (/api/sessions, /api/files)      │    │
 │  │ - WebSocket router (input/resize/ping/buffer)       │    │
 │  │ - node-pty spawns local `claude` process            │    │
-│  │ - SQLite persists sessions + output history         │    │
+│  │ - SQLite persists session metadata                  │    │
 │  │ - Serves the compiled Web frontend                  │    │
 │  └─────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
@@ -126,6 +128,18 @@ CSM listening on http://127.0.0.1:9000
 npm start -- --claude-path /path/to/claude
 ```
 
+> **nvm 用户注意**：CSM 会自动通过 login shell 解析 `claude` 的完整路径，通常无需手动指定 `--claude-path`。如果你用某个 Node 版本运行 CSM，但 `claude` 安装在另一个 Node 版本下，CSM 会自动扫描 nvm 目录找到正确的 `claude` 二进制。
+
+### 全部启动参数
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `--host` / `-h` | `127.0.0.1` | 监听地址 |
+| `--port` / `-p` | 自动分配 9000-9099 | 监听端口 |
+| `--claude-path` | `claude` | Claude CLI 路径，支持相对名或绝对路径 |
+| `--data-dir` | `~/.csm` | 数据存储目录（SQLite 数据库等） |
+| `--auth` | 无 | Basic Auth 凭据，格式 `user:password` |
+
 ### 方式二：Linux 服务器直接运行
 
 ```bash
@@ -161,14 +175,19 @@ npm start -- --host 0.0.0.0 --port 9090
 
 ### 方式三：服务器上运行 Docker（单容器）
 
+> **注意**：需要先自行构建 Docker 镜像，仓库中暂未提供 Dockerfile。
+
 ```bash
+# 构建镜像（需要在仓库根目录下自行创建 Dockerfile）
+docker build -t claude-session-manager .
+
 # 启动容器
 docker run -d \
   --name csm \
   -p 9090:9090 \
   -v csm-data:/root/.csm \
   -v claude-data:/root/.claude \
-  haven1999/claude-session-manager:latest
+  claude-session-manager
 ```
 
 浏览器访问 `http://服务器IP:9090`。
@@ -276,7 +295,7 @@ http://127.0.0.1:9090
 ## 开发
 
 ```bash
-# 启动开发服务器（热重载 TypeScript）
+# 启动后端 TypeScript 编译监听（修改后需手动重启服务）
 npm run dev
 
 # 另一个终端启动前端构建监听
@@ -290,7 +309,7 @@ npm test
 
 | 路径 | 用途 | 是否必须持久化 |
 |------|------|--------------|
-| `~/.csm/sessions.db` | CSM 会话列表 + 输出历史 | 是 |
+| `~/.csm/sessions.db` | CSM 会话元数据（名称、工作目录、状态、时间戳、Claude session ID） | 是 |
 | `~/.claude/sessions/*.json` | Claude CLI 会话元数据 | 是 |
 
 ## 已知问题

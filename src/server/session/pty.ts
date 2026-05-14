@@ -4,6 +4,62 @@ import WebSocket from 'ws';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { execFileSync } from 'child_process';
+
+let resolvedClaudePath: string | null = null;
+
+function resolveClaudePath(claudePath: string): string {
+  if (path.isAbsolute(claudePath)) return claudePath;
+  if (resolvedClaudePath) return resolvedClaudePath;
+
+  // Only allow simple command names to prevent injection
+  if (!/^[a-zA-Z0-9._-]+$/.test(claudePath)) {
+    console.warn(`[CSM PTY] Invalid claudePath "${claudePath}", using as-is`);
+    return claudePath;
+  }
+
+  const userShell = process.env.SHELL || '/bin/zsh';
+  try {
+    const resolved = execFileSync(userShell, ['-lc', `which ${claudePath}`], {
+      encoding: 'utf8',
+      timeout: 5000,
+    }).trim();
+    if (resolved && fs.existsSync(resolved)) {
+      console.log(`[CSM PTY] Resolved claude path via login shell: ${resolved}`);
+      resolvedClaudePath = resolved;
+      return resolved;
+    }
+  } catch {
+    // login shell resolution failed
+  }
+
+  const candidates = [
+    '/usr/local/bin/' + claudePath,
+    '/opt/homebrew/bin/' + claudePath,
+  ];
+
+  // Scan nvm versions directories
+  const nvmDir = path.join(os.homedir(), '.nvm/versions/node');
+  try {
+    const versions = fs.readdirSync(nvmDir).filter(v => v.startsWith('v')).sort().reverse();
+    for (const v of versions) {
+      candidates.push(path.join(nvmDir, v, 'bin', claudePath));
+    }
+  } catch {
+    // nvm not installed
+  }
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      console.log(`[CSM PTY] Resolved claude path via fallback scan: ${candidate}`);
+      resolvedClaudePath = candidate;
+      return candidate;
+    }
+  }
+
+  console.warn(`[CSM PTY] Could not resolve absolute path for "${claudePath}", using as-is`);
+  return claudePath;
+}
 
 export interface PtyOptions {
   cwd: string;
@@ -16,13 +72,13 @@ export interface PtyOptions {
 
 export function spawnPty(options: PtyOptions): pty.IPty {
   const { cwd, sessionId, claudePath, cols = 120, rows = 30, resumeClaudeId } = options;
-  const shell = process.platform === 'win32' ? 'powershell.exe' : claudePath;
+  const resolved = process.platform === 'win32' ? 'powershell.exe' : resolveClaudePath(claudePath);
   const args = resumeClaudeId ? ['--resume', resumeClaudeId] : [];
-  console.log(`[CSM PTY] spawn: ${shell} ${args.join(' ')} in ${cwd} (${cols}x${rows}) resume=${!!resumeClaudeId}`);
+  console.log(`[CSM PTY] spawn: ${resolved} ${args.join(' ')} in ${cwd} (${cols}x${rows}) resume=${!!resumeClaudeId}`);
   console.log(`[CSM PTY] env: HOME=${process.env.HOME || ''} PATH=${process.env.PATH || ''} SHELL=${process.env.SHELL || ''}`);
 
   try {
-    const proc = pty.spawn(shell, args, {
+    const proc = pty.spawn(resolved, args, {
       name: 'xterm-256color',
       cols,
       rows,
