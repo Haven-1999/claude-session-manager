@@ -1,0 +1,26 @@
+src/server/session/pty.ts
+  7cca6b0bf33cbea7 7,9-62,75,77,81
+README.md
+  7cca6b0bf33cbea7 11,13,39,46,71,131-142,178-179,181-183,190,298,312
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.14",
+  "base_commit_sha": "37fb3d114c3f551a7de617d86dd09a749739cf23",
+  "prompts": {
+    "7cca6b0bf33cbea7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e27b71d1-a22c-47f6-91a1-5fe95713eb74",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Haven-1999 <2367682634@qq.com>",
+      "messages": [],
+      "total_additions": 90,
+      "total_deletions": 15,
+      "accepted_lines": 84,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/746ce8d8baac7e5e0ac60676a834fd1d923835ce71ba48b4bb8a00f7d3a9cd80"
+    }
+  }
+}
