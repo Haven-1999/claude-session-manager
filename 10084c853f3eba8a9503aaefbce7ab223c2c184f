@@ -1,0 +1,24 @@
+README.md
+  4dc9fe125aa0316c 90-91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.14",
+  "base_commit_sha": "10084c853f3eba8a9503aaefbce7ab223c2c184f",
+  "prompts": {
+    "4dc9fe125aa0316c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9edb0ef2-ba10-4a9f-9eea-79b1a23b52f0",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Haven-1999 <2367682634@qq.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 0,
+      "accepted_lines": 322,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/6521ce26c2f82494dc104545e99a40bfbb3c61dc9e3aaf8bc47e9a5bdb303154"
+    }
+  }
+}
