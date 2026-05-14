@@ -247,8 +247,25 @@ class App {
       isOpen: false,
       isReady: false,
     };
+
+    // IME deduplication (same workaround as session terminal)
+    let lastData = '';
+    let lastDataTime = 0;
+    const textarea = terminal.textarea!;
+    let compositionJustEnded = false;
+    textarea.addEventListener('compositionend', () => {
+      compositionJustEnded = true;
+      setTimeout(() => { compositionJustEnded = false; }, 50);
+    });
+
     terminal.onData((data) => {
       if (entry.ws?.readyState === WebSocket.OPEN && this.shellVisible && entry.isReady) {
+        const now = Date.now();
+        if (compositionJustEnded && data === lastData && now - lastDataTime < 80) {
+          return;
+        }
+        lastData = data;
+        lastDataTime = now;
         entry.ws.send(JSON.stringify({ type: 'input', data }));
       }
     });
@@ -422,8 +439,26 @@ class App {
     container.style.display = 'none';
     container.style.zIndex = '';
 
+    // Workaround for xterm.js IME duplication: when switching input methods during
+    // composition, both compositionend and input events fire triggerDataEvent, causing
+    // duplicate input. Deduplicate by suppressing identical data within a short window.
+    let lastData = '';
+    let lastDataTime = 0;
+    const textarea = terminal.textarea!;
+    let compositionJustEnded = false;
+    textarea.addEventListener('compositionend', () => {
+      compositionJustEnded = true;
+      setTimeout(() => { compositionJustEnded = false; }, 50);
+    });
+
     const onDataDisposable = terminal.onData((data) => {
       if (this.ws?.readyState === WebSocket.OPEN && this.activeSessionId === sessionId) {
+        const now = Date.now();
+        if (compositionJustEnded && data === lastData && now - lastDataTime < 80) {
+          return;
+        }
+        lastData = data;
+        lastDataTime = now;
         this.ws.send(JSON.stringify({ type: 'input', data }));
       }
     });

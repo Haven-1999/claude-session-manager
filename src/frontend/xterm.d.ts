@@ -1,6 +1,7 @@
 declare module 'xterm' {
   export class Terminal {
     constructor(options?: any);
+    readonly textarea: HTMLTextAreaElement | undefined;
     loadAddon(addon: any): void;
     open(element: HTMLElement): void;
     write(data: string | Uint8Array): void;
