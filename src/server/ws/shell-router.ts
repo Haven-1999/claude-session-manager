@@ -3,6 +3,8 @@ import type { WebSocket, WebSocketServer } from 'ws';
 import * as pty from 'node-pty';
 import * as os from 'os';
 import type { SessionManager } from '../session/manager';
+import type { PtyHandle } from '../session/pty';
+import { spawn } from 'child_process';
 
 interface ShellMessage {
   type: 'input' | 'resize' | 'ping';
@@ -21,6 +23,76 @@ function shellArgs(shell: string): string[] {
   return shell.endsWith('/zsh') || shell.endsWith('/bash') ? ['-l'] : [];
 }
 
+let nodePtyWorks: boolean | null = null;
+
+function checkNodePty(): boolean {
+  if (nodePtyWorks !== null) return nodePtyWorks;
+  try {
+    const p = pty.spawn('/bin/echo', ['test'], {
+      name: 'xterm-256color', cols: 80, rows: 24,
+      cwd: os.homedir(),
+      env: { HOME: os.homedir(), PATH: '/usr/bin:/bin' },
+    });
+    p.kill();
+    nodePtyWorks = true;
+  } catch {
+    nodePtyWorks = false;
+  }
+  return nodePtyWorks;
+}
+
+function spawnShellProcess(shell: string, args: string[], cwd: string, cols: number, rows: number): PtyHandle {
+  if (checkNodePty()) {
+    const proc = pty.spawn(shell, args, {
+      name: 'xterm-256color',
+      cols,
+      rows,
+      cwd,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        TERM: 'xterm-256color',
+        LANG: 'en_US.UTF-8',
+        LC_ALL: 'en_US.UTF-8',
+      },
+    });
+    return {
+      onData: (cb) => proc.onData(cb),
+      onExit: (cb) => proc.onExit(cb),
+      write: (data) => proc.write(data),
+      resize: (c, r) => proc.resize(c, r),
+      kill: (signal?: string) => proc.kill(signal),
+      pid: (proc as any).pid,
+    };
+  }
+
+  // Fallback: use macOS `script` for PTY
+  console.log('[CSM Shell] using script-based fallback');
+  const cp = spawn('/usr/bin/script', ['-q', '/dev/null', shell, ...args], {
+    cwd,
+    env: {
+      ...process.env,
+      TERM: 'xterm-256color',
+      LANG: 'en_US.UTF-8',
+      LC_ALL: 'en_US.UTF-8',
+      COLUMNS: String(cols),
+      LINES: String(rows),
+    },
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  return {
+    onData: (cb) => {
+      cp.stdout?.on('data', (chunk: Buffer) => cb(chunk.toString('utf8')));
+      cp.stderr?.on('data', (chunk: Buffer) => cb(chunk.toString('utf8')));
+    },
+    onExit: (cb) => cp.on('exit', (code) => cb({ exitCode: code ?? 1 })),
+    write: (data) => cp.stdin?.write(data),
+    resize: () => {},
+    kill: (signal?: string) => cp.kill(signal as NodeJS.Signals || 'SIGTERM'),
+    pid: cp.pid!,
+  };
+}
+
 export function setupShellWebSocketRouter(wss: WebSocketServer, manager: SessionManager): void {
   wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
     const url = new URL(req.url || '/', `http://${req.headers.host}`);
@@ -36,23 +108,11 @@ export function setupShellWebSocketRouter(wss: WebSocketServer, manager: Session
       return;
     }
 
-    let shellProcess: pty.IPty | null = null;
+    let shellProcess: PtyHandle | null = null;
 
     try {
       const shell = resolveShell();
-      shellProcess = pty.spawn(shell, shellArgs(shell), {
-        name: 'xterm-256color',
-        cols: 120,
-        rows: 30,
-        cwd: session.cwd,
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          TERM: 'xterm-256color',
-          LANG: 'en_US.UTF-8',
-          LC_ALL: 'en_US.UTF-8',
-        },
-      });
+      shellProcess = spawnShellProcess(shell, shellArgs(shell), session.cwd, 120, 30);
     } catch {
       ws.close(1011, 'Failed to spawn shell');
       return;

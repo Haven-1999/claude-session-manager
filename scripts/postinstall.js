@@ -68,11 +68,9 @@ function main() {
   if (testNodePty()) {
     log('node-pty rebuilt and verified: OK');
   } else {
-    error('node-pty still not working after rebuild.');
-    error('Your Node.js version may be incompatible with node-pty.');
-    error('Fix: nvm install 20 && nvm use 20 && rm -rf node_modules && npm install');
-    error('Or run: bash scripts/setup.sh (auto-switches Node version)');
-    process.exit(1);
+    warn('node-pty still not working after rebuild.');
+    warn('The server will use script-based PTY fallback on this system.');
+    warn('For best experience, try: nvm install 20 && nvm use 20 && rm -rf node_modules && npm install');
   }
 }
 

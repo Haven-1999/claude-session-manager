@@ -4,7 +4,8 @@ import WebSocket from 'ws';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { execFileSync, spawnSync } from 'child_process';
+import { execFileSync, spawnSync, spawn, type ChildProcess } from 'child_process';
+import { EventEmitter } from 'events';
 
 let resolvedClaudePath: string | null = null;
 
@@ -12,7 +13,6 @@ function resolveClaudePath(claudePath: string): string {
   if (path.isAbsolute(claudePath)) return claudePath;
   if (resolvedClaudePath) return resolvedClaudePath;
 
-  // Only allow simple command names to prevent injection
   if (!/^[a-zA-Z0-9._-]+$/.test(claudePath)) {
     console.warn(`[CSM PTY] Invalid claudePath "${claudePath}", using as-is`);
     return claudePath;
@@ -38,7 +38,6 @@ function resolveClaudePath(claudePath: string): string {
     '/opt/homebrew/bin/' + claudePath,
   ];
 
-  // Scan nvm versions directories
   const nvmDir = path.join(os.homedir(), '.nvm/versions/node');
   try {
     const versions = fs.readdirSync(nvmDir).filter(v => v.startsWith('v')).sort().reverse();
@@ -70,6 +69,15 @@ export interface PtyOptions {
   resumeClaudeId?: string | null;
 }
 
+export interface PtyHandle {
+  onData: (cb: (data: string) => void) => void;
+  onExit: (cb: (exit: { exitCode: number }) => void) => void;
+  write: (data: string) => void;
+  resize: (cols: number, rows: number) => void;
+  kill: (signal?: string) => void;
+  pid: number;
+}
+
 function cleanPath(rawPath: string | undefined): string {
   if (!rawPath) return '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin';
   return rawPath
@@ -78,39 +86,83 @@ function cleanPath(rawPath: string | undefined): string {
     .join(':');
 }
 
-export function spawnPty(options: PtyOptions): pty.IPty {
-  const { cwd, sessionId, claudePath, cols = 120, rows = 30, resumeClaudeId } = options;
-  const resolved = process.platform === 'win32' ? 'powershell.exe' : resolveClaudePath(claudePath);
-  const args = resumeClaudeId ? ['--resume', resumeClaudeId] : [];
-  const cleanedPath = cleanPath(process.env.PATH);
-  console.log(`[CSM PTY] spawn: ${resolved} ${args.join(' ')} in ${cwd} (${cols}x${rows}) resume=${!!resumeClaudeId}`);
+let nodePtyWorks: boolean | null = null;
 
-  // Pre-flight checks
-  if (process.platform !== 'win32') {
-    try {
-      const stat = fs.statSync(resolved);
-      const isExecutable = !!(stat.mode & 0o111);
-      console.log(`[CSM PTY] file check: exists=${true} size=${stat.size} executable=${isExecutable} isSymlink=${fs.lstatSync(resolved).isSymbolicLink()}`);
-      if (stat.size === 0) {
-        throw new Error(`Claude binary is empty (0 bytes): ${resolved}`);
-      }
-      if (!isExecutable) {
-        throw new Error(`Claude binary is not executable: ${resolved}`);
-      }
-    } catch (e: any) {
-      if (e.code === 'ENOENT') {
-        throw new Error(`Claude binary not found: ${resolved}`);
-      }
-      throw e;
+function testNodePty(): boolean {
+  if (nodePtyWorks !== null) return nodePtyWorks;
+  try {
+    const testProc = pty.spawn('/bin/echo', ['test'], {
+      name: 'xterm-256color',
+      cols: 80,
+      rows: 24,
+      cwd: os.homedir(),
+      env: { HOME: os.homedir(), PATH: '/usr/bin:/bin' },
+    });
+    testProc.kill();
+    nodePtyWorks = true;
+    console.log('[CSM PTY] node-pty: OK');
+  } catch {
+    nodePtyWorks = false;
+    console.warn('[CSM PTY] node-pty: FAILED, will use script-based fallback');
+  }
+  return nodePtyWorks;
+}
+
+class ScriptPtyHandle extends EventEmitter implements PtyHandle {
+  private proc: ChildProcess;
+  readonly pid: number;
+
+  constructor(shell: string, shellArgs: string[], options: {
+    cwd: string;
+    env: Record<string, string>;
+    cols: number;
+    rows: number;
+  }) {
+    super();
+    const envArgs: string[] = [];
+    for (const [k, v] of Object.entries(options.env)) {
+      envArgs.push(`${k}=${v}`);
     }
-    // Check if cwd exists
-    if (!fs.existsSync(cwd)) {
-      throw new Error(`Working directory does not exist: ${cwd}`);
-    }
+    const innerCmd = [shell, ...shellArgs].map(a => a.replace(/'/g, "'\\''")).map(a => `'${a}'`).join(' ');
+
+    // Use `script -q /dev/null` on macOS to create a real PTY
+    // env -i sets a clean environment, then runs script which allocates a PTY
+    this.proc = spawn('/usr/bin/script', ['-q', '/dev/null', shell, ...shellArgs], {
+      cwd: options.cwd,
+      env: { ...options.env, COLUMNS: String(options.cols), LINES: String(options.rows) },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+
+    this.pid = this.proc.pid!;
+    console.log(`[CSM PTY] script-fallback spawned, pid=${this.pid}`);
   }
 
+  onData(cb: (data: string) => void): void {
+    this.proc.stdout?.on('data', (chunk: Buffer) => cb(chunk.toString('utf8')));
+    this.proc.stderr?.on('data', (chunk: Buffer) => cb(chunk.toString('utf8')));
+  }
+
+  onExit(cb: (exit: { exitCode: number }) => void): void {
+    this.proc.on('exit', (code) => cb({ exitCode: code ?? 1 }));
+  }
+
+  write(data: string): void {
+    this.proc.stdin?.write(data);
+  }
+
+  resize(_cols: number, _rows: number): void {
+    // script-based fallback has limited resize support
+    // SIGWINCH doesn't propagate through script on all macOS versions
+  }
+
+  kill(signal?: string): void {
+    this.proc.kill(signal as NodeJS.Signals || 'SIGTERM');
+  }
+}
+
+function buildSpawnEnv(cleanedPath: string): Record<string, string> {
   const shell = process.env.SHELL || '/bin/zsh';
-  const spawnEnv: Record<string, string> = {
+  return {
     HOME: process.env.HOME || os.homedir(),
     USER: process.env.USER || '',
     SHELL: shell,
@@ -120,55 +172,38 @@ export function spawnPty(options: PtyOptions): pty.IPty {
     LANG: 'en_US.UTF-8',
     LC_ALL: 'en_US.UTF-8',
   };
+}
 
-  // Debug: print full spawn parameters
+export function spawnPty(options: PtyOptions): PtyHandle {
+  const { cwd, claudePath, cols = 120, rows = 30, resumeClaudeId } = options;
+  const resolved = process.platform === 'win32' ? 'powershell.exe' : resolveClaudePath(claudePath);
+  const args = resumeClaudeId ? ['--resume', resumeClaudeId] : [];
+  const cleanedPath = cleanPath(process.env.PATH);
+  const shell = process.env.SHELL || '/bin/zsh';
+  const spawnEnv = buildSpawnEnv(cleanedPath);
+
+  console.log(`[CSM PTY] spawn: ${resolved} ${args.join(' ')} in ${cwd} (${cols}x${rows}) resume=${!!resumeClaudeId}`);
+
+  // Pre-flight checks
+  if (process.platform !== 'win32') {
+    try {
+      const stat = fs.statSync(resolved);
+      const isExecutable = !!(stat.mode & 0o111);
+      if (stat.size === 0) throw new Error(`Claude binary is empty (0 bytes): ${resolved}`);
+      if (!isExecutable) throw new Error(`Claude binary is not executable: ${resolved}`);
+    } catch (e: any) {
+      if (e.code === 'ENOENT') throw new Error(`Claude binary not found: ${resolved}`);
+      throw e;
+    }
+    if (!fs.existsSync(cwd)) throw new Error(`Working directory does not exist: ${cwd}`);
+  }
+
   const cmdParts = [resolved, ...args].map(a => a.replace(/'/g, "'\\''")).map(a => `'${a}'`).join(' ');
   const spawnCmd = `exec ${cmdParts}`;
-  console.log(`[CSM PTY] shell: ${shell} (exists=${fs.existsSync(shell)})`);
-  console.log(`[CSM PTY] spawnCmd: ${spawnCmd}`);
-  console.log(`[CSM PTY] env:`, JSON.stringify(spawnEnv));
-  console.log(`[CSM PTY] cwd: ${cwd} (accessible=${(() => { try { fs.accessSync(cwd, fs.constants.R_OK | fs.constants.X_OK); return true; } catch { return false; } })()})`);
 
-  // Diagnostic: test child_process.spawn (no PTY) to isolate the issue
-  try {
-    const cpResult = spawnSync('/bin/echo', ['cp-test-ok'], { encoding: 'utf8', timeout: 3000 });
-    console.log(`[CSM PTY] diagnostic child_process.spawnSync: status=${cpResult.status} stdout=${cpResult.stdout?.trim()} error=${cpResult.error?.message || 'none'}`);
-  } catch (cpErr: any) {
-    console.error(`[CSM PTY] diagnostic child_process FAILED:`, cpErr.message);
-  }
-
-  // Diagnostic: check system PTY/fd limits
-  try {
-    const ulimitResult = spawnSync('/bin/sh', ['-c', 'ulimit -n'], { encoding: 'utf8', timeout: 3000 });
-    const ptmxExists = fs.existsSync('/dev/ptmx');
-    console.log(`[CSM PTY] system: ulimit-n=${ulimitResult.stdout?.trim()} /dev/ptmx=${ptmxExists}`);
-  } catch { /* ignore */ }
-
-  // Diagnostic: check node-pty native addon
-  try {
-    const ptyNativePath = require.resolve('node-pty/build/Release/pty.node');
-    const ptyNativeStat = fs.statSync(ptyNativePath);
-    console.log(`[CSM PTY] native addon: path=${ptyNativePath} size=${ptyNativeStat.size}`);
-  } catch (e: any) {
-    console.error(`[CSM PTY] native addon NOT FOUND:`, e.message);
-  }
-
-  // Diagnostic: try spawning a minimal command via node-pty
-  try {
-    const testProc = pty.spawn('/bin/echo', ['pty-test-ok'], {
-      name: 'xterm-256color',
-      cols: 80,
-      rows: 24,
-      cwd: os.homedir(),
-      env: { HOME: os.homedir(), PATH: '/usr/bin:/bin' },
-    });
-    console.log(`[CSM PTY] diagnostic pty.spawn /bin/echo succeeded, pid=${(testProc as any).pid}`);
-    testProc.kill();
-  } catch (diagErr: any) {
-    console.error(`[CSM PTY] diagnostic pty.spawn /bin/echo FAILED:`, diagErr.message);
-  }
-
-  try {
+  // Try node-pty first
+  if (testNodePty()) {
+    console.log(`[CSM PTY] using node-pty`);
     const proc = pty.spawn(shell, ['-lc', spawnCmd], {
       name: 'xterm-256color',
       cols,
@@ -177,15 +212,19 @@ export function spawnPty(options: PtyOptions): pty.IPty {
       encoding: 'utf8',
       env: spawnEnv,
     });
-
-    return proc;
-  } catch (err: any) {
-    console.error(`[CSM PTY] spawn failed: ${err.message}`);
-    console.error(`[CSM PTY] spawn details: shell=${shell} args=['-lc', '${spawnCmd}'] cwd=${cwd}`);
-    console.error(`[CSM PTY] node-pty version:`, require('node-pty/package.json').version);
-    console.error(`[CSM PTY] node version: ${process.version}, platform: ${process.platform}, arch: ${process.arch}`);
-    throw err;
+    return {
+      onData: (cb) => proc.onData(cb),
+      onExit: (cb) => proc.onExit(cb),
+      write: (data) => proc.write(data),
+      resize: (c, r) => proc.resize(c, r),
+      kill: (signal?: string) => proc.kill(signal),
+      pid: (proc as any).pid,
+    };
   }
+
+  // Fallback: use macOS `script` command for PTY allocation
+  console.log(`[CSM PTY] using script-based fallback`);
+  return new ScriptPtyHandle(shell, ['-lc', spawnCmd], { cwd, env: spawnEnv, cols, rows });
 }
 
 export async function waitForClaudeSessionId(pid: number, timeoutMs = 10000): Promise<string | null> {
