@@ -109,32 +109,57 @@ export function spawnPty(options: PtyOptions): pty.IPty {
     }
   }
 
-  console.log(`[CSM PTY] env: HOME=${process.env.HOME || ''} SHELL=${process.env.SHELL || ''}`);
+  const shell = process.env.SHELL || '/bin/zsh';
+  const spawnEnv: Record<string, string> = {
+    HOME: process.env.HOME || os.homedir(),
+    USER: process.env.USER || '',
+    SHELL: shell,
+    PATH: cleanedPath,
+    CLAUDE_CSM_MODE: '1',
+    TERM: 'xterm-256color',
+    LANG: 'en_US.UTF-8',
+    LC_ALL: 'en_US.UTF-8',
+  };
+
+  // Debug: print full spawn parameters
+  const cmdParts = [resolved, ...args].map(a => a.replace(/'/g, "'\\''")).map(a => `'${a}'`).join(' ');
+  const spawnCmd = `exec ${cmdParts}`;
+  console.log(`[CSM PTY] shell: ${shell} (exists=${fs.existsSync(shell)})`);
+  console.log(`[CSM PTY] spawnCmd: ${spawnCmd}`);
+  console.log(`[CSM PTY] env:`, JSON.stringify(spawnEnv));
+  console.log(`[CSM PTY] cwd: ${cwd} (accessible=${(() => { try { fs.accessSync(cwd, fs.constants.R_OK | fs.constants.X_OK); return true; } catch { return false; } })()})`);
+
+  // Diagnostic: try spawning a minimal command first
+  try {
+    const testProc = pty.spawn('/bin/echo', ['pty-test-ok'], {
+      name: 'xterm-256color',
+      cols: 80,
+      rows: 24,
+      cwd: os.homedir(),
+      env: { HOME: os.homedir(), PATH: '/usr/bin:/bin' },
+    });
+    console.log(`[CSM PTY] diagnostic spawn /bin/echo succeeded, pid=${(testProc as any).pid}`);
+    testProc.kill();
+  } catch (diagErr: any) {
+    console.error(`[CSM PTY] diagnostic spawn /bin/echo ALSO FAILED:`, diagErr.message);
+  }
 
   try {
-    const shell = process.env.SHELL || '/bin/zsh';
-    const cmdParts = [resolved, ...args].map(a => a.replace(/'/g, "'\\''")).map(a => `'${a}'`).join(' ');
-    const proc = pty.spawn(shell, ['-lc', `exec ${cmdParts}`], {
+    const proc = pty.spawn(shell, ['-lc', spawnCmd], {
       name: 'xterm-256color',
       cols,
       rows,
       cwd,
       encoding: 'utf8',
-      env: {
-        HOME: process.env.HOME || os.homedir(),
-        USER: process.env.USER || '',
-        SHELL: shell,
-        PATH: cleanedPath,
-        CLAUDE_CSM_MODE: '1',
-        TERM: 'xterm-256color',
-        LANG: 'en_US.UTF-8',
-        LC_ALL: 'en_US.UTF-8',
-      },
+      env: spawnEnv,
     });
 
     return proc;
-  } catch (err) {
-    console.error('[CSM PTY] spawn failed', err);
+  } catch (err: any) {
+    console.error(`[CSM PTY] spawn failed: ${err.message}`);
+    console.error(`[CSM PTY] spawn details: shell=${shell} args=['-lc', '${spawnCmd}'] cwd=${cwd}`);
+    console.error(`[CSM PTY] node-pty version:`, require('node-pty/package.json').version);
+    console.error(`[CSM PTY] node version: ${process.version}, platform: ${process.platform}, arch: ${process.arch}`);
     throw err;
   }
 }
