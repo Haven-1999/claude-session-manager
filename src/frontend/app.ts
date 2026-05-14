@@ -250,26 +250,31 @@ class App {
 
     // IME deduplication (same workaround as session terminal)
     const textarea = terminal.textarea!;
+    let isComposing = false;
     let imeFlushTimer: number | null = null;
     let imeBufferedData: string | null = null;
+
+    textarea.addEventListener('compositionstart', () => { isComposing = true; });
     textarea.addEventListener('compositionend', () => {
-      imeBufferedData = null;
-      if (imeFlushTimer !== null) clearTimeout(imeFlushTimer);
-      imeFlushTimer = window.setTimeout(() => {
-        if (imeBufferedData !== null) {
-          if (entry.ws?.readyState === WebSocket.OPEN && this.shellVisible && entry.isReady) {
-            entry.ws.send(JSON.stringify({ type: 'input', data: imeBufferedData }));
-          }
-          imeBufferedData = null;
-        }
-        imeFlushTimer = null;
-      }, 30);
+      if (imeFlushTimer === null) isComposing = false;
     });
 
     terminal.onData((data) => {
       if (entry.ws?.readyState === WebSocket.OPEN && this.shellVisible && entry.isReady) {
-        if (imeFlushTimer !== null) {
+        if (isComposing || imeFlushTimer !== null) {
           imeBufferedData = data;
+          if (imeFlushTimer === null) {
+            imeFlushTimer = window.setTimeout(() => {
+              isComposing = false;
+              imeFlushTimer = null;
+              if (imeBufferedData !== null) {
+                if (entry.ws?.readyState === WebSocket.OPEN && this.shellVisible && entry.isReady) {
+                  entry.ws.send(JSON.stringify({ type: 'input', data: imeBufferedData }));
+                }
+                imeBufferedData = null;
+              }
+            }, 20);
+          }
           return;
         }
         entry.ws.send(JSON.stringify({ type: 'input', data }));
@@ -446,31 +451,37 @@ class App {
     container.style.zIndex = '';
 
     // Workaround for xterm.js IME duplication: when switching input methods during
-    // composition, xterm.js fires triggerDataEvent twice — once from _finalizeComposition
-    // (with stale composition text including syllable spaces) and once from _inputEvent
-    // (with the correct raw text). We buffer events in a short window after compositionend
-    // and only send the last one.
+    // composition, xterm.js fires triggerDataEvent twice via different paths.
+    // Track composition state from compositionstart, and when onData fires during
+    // composition (meaning finalization happened), buffer events for a short window
+    // and only send the last one (which is the correct committed text).
     const textarea = terminal.textarea!;
+    let isComposing = false;
     let imeFlushTimer: number | null = null;
     let imeBufferedData: string | null = null;
+
+    textarea.addEventListener('compositionstart', () => { isComposing = true; });
     textarea.addEventListener('compositionend', () => {
-      imeBufferedData = null;
-      if (imeFlushTimer !== null) clearTimeout(imeFlushTimer);
-      imeFlushTimer = window.setTimeout(() => {
-        if (imeBufferedData !== null) {
-          if (this.ws?.readyState === WebSocket.OPEN && this.activeSessionId === sessionId) {
-            this.ws.send(JSON.stringify({ type: 'input', data: imeBufferedData }));
-          }
-          imeBufferedData = null;
-        }
-        imeFlushTimer = null;
-      }, 30);
+      // If no onData arrived during composition (e.g. empty commit), clear state
+      if (imeFlushTimer === null) isComposing = false;
     });
 
     const onDataDisposable = terminal.onData((data) => {
       if (this.ws?.readyState === WebSocket.OPEN && this.activeSessionId === sessionId) {
-        if (imeFlushTimer !== null) {
+        if (isComposing || imeFlushTimer !== null) {
           imeBufferedData = data;
+          if (imeFlushTimer === null) {
+            imeFlushTimer = window.setTimeout(() => {
+              isComposing = false;
+              imeFlushTimer = null;
+              if (imeBufferedData !== null) {
+                if (this.ws?.readyState === WebSocket.OPEN && this.activeSessionId === sessionId) {
+                  this.ws.send(JSON.stringify({ type: 'input', data: imeBufferedData }));
+                }
+                imeBufferedData = null;
+              }
+            }, 20);
+          }
           return;
         }
         this.ws.send(JSON.stringify({ type: 'input', data }));
