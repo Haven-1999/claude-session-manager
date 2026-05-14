@@ -140,6 +140,7 @@ class App {
 
     this.setupEditorResize();
     this.setupShellResize();
+    this.setupSidebarResize();
 
     // Apply initial settings after all components are initialized
     this.applySettings(this.settings.data);
@@ -1414,6 +1415,39 @@ class App {
       if (!isDragging) return;
       const delta = startX - e.clientX;
       const newWidth = Math.min(Math.max(startWidth + delta, 200), 800);
+      sidebar.style.width = `${newWidth}px`;
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (!isDragging) return;
+      isDragging = false;
+      handle.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      this.fitActiveTerminal();
+    });
+  }
+
+  private setupSidebarResize(): void {
+    const handle = document.getElementById('sidebar-resize-handle')!;
+    const sidebar = document.getElementById('session-list')!;
+    let isDragging = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    handle.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      startX = e.clientX;
+      startWidth = sidebar.offsetWidth;
+      handle.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const delta = e.clientX - startX;
+      const newWidth = Math.min(Math.max(startWidth + delta, 160), 480);
       sidebar.style.width = `${newWidth}px`;
     });
 
