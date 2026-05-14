@@ -70,12 +70,21 @@ export interface PtyOptions {
   resumeClaudeId?: string | null;
 }
 
+function cleanPath(rawPath: string | undefined): string {
+  if (!rawPath) return '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin';
+  return rawPath
+    .split(':')
+    .filter(p => !p.includes('node_modules/.bin'))
+    .join(':');
+}
+
 export function spawnPty(options: PtyOptions): pty.IPty {
   const { cwd, sessionId, claudePath, cols = 120, rows = 30, resumeClaudeId } = options;
   const resolved = process.platform === 'win32' ? 'powershell.exe' : resolveClaudePath(claudePath);
   const args = resumeClaudeId ? ['--resume', resumeClaudeId] : [];
+  const cleanedPath = cleanPath(process.env.PATH);
   console.log(`[CSM PTY] spawn: ${resolved} ${args.join(' ')} in ${cwd} (${cols}x${rows}) resume=${!!resumeClaudeId}`);
-  console.log(`[CSM PTY] env: HOME=${process.env.HOME || ''} PATH=${process.env.PATH || ''} SHELL=${process.env.SHELL || ''}`);
+  console.log(`[CSM PTY] env: HOME=${process.env.HOME || ''} PATH=${cleanedPath} SHELL=${process.env.SHELL || ''}`);
 
   try {
     const proc = pty.spawn(resolved, args, {
@@ -86,6 +95,7 @@ export function spawnPty(options: PtyOptions): pty.IPty {
       encoding: 'utf8',
       env: {
         ...process.env,
+        PATH: cleanedPath,
         CLAUDE_CSM_MODE: '1',
         TERM: 'xterm-256color',
         LANG: 'en_US.UTF-8',
