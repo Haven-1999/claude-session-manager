@@ -4,7 +4,7 @@
 
 Mac 本地或 Linux 服务器均可部署，手机、平板、电脑通过浏览器访问同一套会话。
 
-![CSM Screenshot](image/app2.png)
+![CSM Demo](image/demo.gif)
 
 ## 为什么需要 CSM
 
@@ -36,7 +36,7 @@ CSM 把 Claude Code 会话变成一个 Web 服务：
 
 **移动端适配** — 手机浏览器可访问，窄屏下侧边栏自动收为抽屉，终端区域占满全宽
 
-<img src="image/mobile-screenshot.jpg" alt="CSM Mobile Screenshot" width="320">
+<img src="image/demo-phone.gif" alt="CSM Mobile Demo" width="320">
 
 ## 快速开始
 
