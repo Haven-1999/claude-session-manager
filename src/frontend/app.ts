@@ -1519,14 +1519,14 @@ class App {
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       this.logDebug(`Paste item[${i}]: kind=${item.kind}, type=${item.type}`);
-      if (item.kind === 'file' && item.type.startsWith('image/')) {
+      if (item.kind === 'file') {
         const file = item.getAsFile();
         if (file) files.push(file);
       }
     }
 
     if (files.length === 0) {
-      this.logDebug('Paste: no image files found');
+      this.logDebug('Paste: no files found');
       return Promise.resolve();
     }
 
@@ -1538,7 +1538,7 @@ class App {
 
     return (async () => {
       for (const file of files) {
-        this.logDebug(`Pasting image: ${file.name} (${file.size} bytes)`);
+        this.logDebug(`Pasting file: ${file.name} (${file.size} bytes)`);
         try {
           const base64 = await readFileAsBase64(file);
           const res = await fetch('/api/upload', {
@@ -1555,11 +1555,11 @@ class App {
             this.logDebug(`Upload failed: HTTP ${res.status} body=${text.slice(0, 200)}`);
             let errMsg = res.statusText;
             try { errMsg = JSON.parse(text).error || errMsg; } catch {}
-            showAlert('Failed to upload image: ' + errMsg);
+            showAlert('Failed to upload file: ' + errMsg);
             continue;
           }
           const result = await res.json();
-          this.logDebug(`Image uploaded to: ${result.path}`);
+          this.logDebug(`File uploaded to: ${result.path}`);
 
           if (this.ws?.readyState === WebSocket.OPEN && this.activeSessionId) {
             const displayPath = result.path.startsWith('/root/')
@@ -1568,7 +1568,7 @@ class App {
             this.ws.send(JSON.stringify({ type: 'input', data: displayPath }));
           }
         } catch (err) {
-          showAlert('Error uploading image: ' + (err as Error).message);
+          showAlert('Error uploading file: ' + (err as Error).message);
         }
       }
     })();

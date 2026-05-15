@@ -189,8 +189,8 @@ export function createHttpServer(manager: SessionManager, options: Pick<ServerOp
 
     try {
       const buffer = Buffer.from(data, 'base64');
-      const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
-      if (buffer.length > MAX_IMAGE_SIZE) {
+      const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+      if (buffer.length > MAX_FILE_SIZE) {
         return res.status(413).json({ error: 'File too large (max 10MB)' });
       }
       fs.writeFileSync(filePath, buffer);
