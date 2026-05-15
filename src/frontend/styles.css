@@ -82,6 +82,53 @@ html, body, #app {
   transform: scale(0.97);
 }
 
+/* Action More (mobile dropdown) */
+.action-more-wrap {
+  position: relative;
+  display: none;
+}
+.action-more {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  min-width: 36px;
+  min-height: 32px;
+}
+.action-more:hover {
+  background: var(--accent-hover);
+}
+.action-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  min-width: 160px;
+  padding: 4px 0;
+  z-index: 300;
+}
+.action-menu.hidden {
+  display: none;
+}
+.action-menu-item {
+  padding: 10px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--fg-primary);
+  white-space: nowrap;
+}
+.action-menu-item:hover {
+  background: var(--bg-hover);
+}
+
 .menu-btn {
   background: transparent;
   color: var(--fg-primary);
@@ -1186,4 +1233,6 @@ body[data-theme="light"] {
 
   .top-bar { padding: 0 12px; }
   .actions button { padding: 6px 10px; font-size: 12px; }
+  .action-desktop { display: none !important; }
+  .action-more-wrap { display: block; }
 }

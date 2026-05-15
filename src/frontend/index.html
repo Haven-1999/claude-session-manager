@@ -24,10 +24,19 @@
       </div>
       <div class="actions">
         <button id="btn-new">+ New Session</button>
-        <button id="btn-shell" class="btn-secondary" title="Toggle current path terminal">Shell</button>
-        <button id="btn-debug">Debug</button>
-        <button id="btn-theme" title="Toggle theme">☀</button>
-        <button id="btn-settings">Settings</button>
+        <button id="btn-shell" class="btn-secondary action-desktop" title="Toggle current path terminal">Shell</button>
+        <button id="btn-debug" class="action-desktop">Debug</button>
+        <button id="btn-theme" class="action-desktop" title="Toggle theme">☀</button>
+        <button id="btn-settings" class="action-desktop">Settings</button>
+        <div class="action-more-wrap">
+          <button id="btn-more" class="action-more" title="More actions">⋮</button>
+          <div id="action-menu" class="action-menu hidden">
+            <div class="action-menu-item" data-action="shell">Shell</div>
+            <div class="action-menu-item" data-action="debug">Debug</div>
+            <div class="action-menu-item" data-action="theme"><span id="action-menu-theme-label">☀ Light mode</span></div>
+            <div class="action-menu-item" data-action="settings">Settings</div>
+          </div>
+        </div>
       </div>
     </header>
     <div class="main-layout">

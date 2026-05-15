@@ -203,6 +203,30 @@ class App {
       }
     });
 
+    const actionMenu = document.getElementById('action-menu')!;
+    document.getElementById('btn-more')!.addEventListener('click', (e) => {
+      e.stopPropagation();
+      actionMenu.classList.toggle('hidden');
+    });
+    actionMenu.addEventListener('click', (e) => {
+      const item = (e.target as HTMLElement).closest('.action-menu-item') as HTMLElement | null;
+      if (!item) return;
+      actionMenu.classList.add('hidden');
+      const action = item.dataset.action;
+      if (action === 'shell') this.toggleShellPanel();
+      else if (action === 'debug') this.toggleDebugPanel();
+      else if (action === 'theme') {
+        const next = this.settings.data.theme === 'dark' ? 'light' : 'dark';
+        this.settings.set('theme', next);
+      } else if (action === 'settings') {
+        if (this.isTauri) this.openTauriSettings();
+        else this.showSettingsModal();
+      }
+    });
+    document.addEventListener('click', () => {
+      actionMenu.classList.add('hidden');
+    });
+
     if (this.isTauri) {
       this.setupTauriTunnelListeners().then(() => {
         this.loadSessions();
@@ -1218,6 +1242,10 @@ class App {
     const themeBtn = document.getElementById('btn-theme')!;
     themeBtn.textContent = isDark ? '☀' : '🌙';
     themeBtn.title = isDark ? 'Switch to Light' : 'Switch to Dark';
+    const menuThemeLabel = document.getElementById('action-menu-theme-label');
+    if (menuThemeLabel) {
+      menuThemeLabel.textContent = isDark ? '☀ Light mode' : '🌙 Dark mode';
+    }
 
     const xtermTheme = isDark ? oneDarkTheme : oneLightTheme;
 
