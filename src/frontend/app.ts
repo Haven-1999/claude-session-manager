@@ -117,6 +117,7 @@ class App {
       const editor = document.getElementById('code-editor')!;
       editor.classList.add('hidden');
       editor.classList.remove('open');
+      editor.style.width = '';
       this.fitActiveTerminal();
     };
     this.codeEditor.onSave = async (path, content) => {
