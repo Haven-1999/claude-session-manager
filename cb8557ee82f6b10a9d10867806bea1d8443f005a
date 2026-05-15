@@ -1,0 +1,102 @@
+.gitignore
+  cb232ac3a9cec4c4 19-24
+src/index.ts
+  4374f76991b888f4 9,11,18,26,29,69,71-79,84
+scripts/postinstall.js
+  4374f76991b888f4 104-113
+src/server/tunnel/cloudflare.ts
+  4374f76991b888f4 1-68
+scripts/install-cloudflared.js
+  4374f76991b888f4 1-130
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.14",
+  "base_commit_sha": "cb8557ee82f6b10a9d10867806bea1d8443f005a",
+  "prompts": {
+    "1f1e9b0086d6b528": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0ce648c5-8f28-4cda-bbd0-88ef7edab30b",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Haven-1999 <2367682634@qq.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/540be83cd29c273ecd0207587d637bb14380ee5e1d21edd15cb741accbe91269"
+    },
+    "4374f76991b888f4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2acb85ea-206a-45bc-863a-e341aa587daf",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Haven-1999 <2367682634@qq.com>",
+      "messages": [],
+      "total_additions": 238,
+      "total_deletions": 17,
+      "accepted_lines": 224,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/3a1b91510936e7230ebd3ac19a0734375d270c16a6ba664b20829c4463d85769"
+    },
+    "6dedf19f9dd20bb5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3f167d43-5fe7-4340-a3df-046d1fe5f3f5",
+        "model": "<synthetic>"
+      },
+      "human_author": "Haven-1999 <2367682634@qq.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 18,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/8ebd1932c9162191c82cf81cabef4dcc7def9ec64bb35d64f705e8308195b8dd"
+    },
+    "a4ff5eca29f03d64": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0163e51e-4ffe-4b84-9ec5-23bfdbeaffc1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Haven-1999 <2367682634@qq.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 198,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/588ff6a9405b4919d6abb6869645d015e69244c642c3295037c47d5657c8fc76"
+    },
+    "aa9caa3de89e3318": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c6fb2ea0-3b91-4f38-8380-d4db3a52a1a5",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Haven-1999 <2367682634@qq.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 0,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/b4466aa51aadc9fc0d3e30149be23019c8747fe77985a8682b3dffb79dd0c2d4"
+    },
+    "cb232ac3a9cec4c4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c065b689-222b-491c-b148-73786cf0218c",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Haven-1999 <2367682634@qq.com>",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 0,
+      "accepted_lines": 6,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/6dcd7ea7b4fd14ca3b10c04e179cc0b4f81218eea316404ac3796ccfc622da35"
+    }
+  }
+}
