@@ -36,6 +36,7 @@ function resolveClaudePath(claudePath: string): string {
 
   const candidates = [
     '/usr/local/bin/' + claudePath,
+    '/usr/bin/' + claudePath,
     '/opt/homebrew/bin/' + claudePath,
   ];
 
